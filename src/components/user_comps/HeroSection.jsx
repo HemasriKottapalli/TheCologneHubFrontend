@@ -36,7 +36,7 @@ function HeroSection() {
       navigate('/shop');
   }
 
-   // Generate fairy dust particles - MORE with BIGGER sizes, only on image side
+   // Generate fairy dust particles - MORE with BIGGER sizes, only on image side (desktop only)
    const particles = Array.from({ length: 80 }, (_, i) => ({
      id: i,
      size: Math.random() * 15 + 0.5, // Sizes from 0.5px to 15.5px (BIGGER)
@@ -47,9 +47,9 @@ function HeroSection() {
    }));
 
    return (
-    <div className="  relative flex justify-between items-center h-auto pt-4 gap-6 overflow-hidden">
-       {/* Fairy Dust Background Animation */}
-       <div className="absolute inset-0 pointer-events-none z-0">
+    <div className="relative flex justify-between items-center h-auto pt-4 pb-8 md:pb-4 gap-6 overflow-hidden">
+       {/* Fairy Dust Background Animation - Hidden on mobile */}
+       <div className="absolute inset-0 pointer-events-none z-0 hidden md:block">
          {particles.map((particle) => (
            <div
              key={particle.id}
@@ -89,17 +89,18 @@ function HeroSection() {
          ))}
        </div>
 
-       <div className="flex flex-col gap-4 max-w-2xl ml-[5%] relative z-10">
-          <small className="font-bold text-3xl text-main-color">Hey, {username ? username : ''}</small>
-          <h1 className="font-bold text-4xl">Welcome to <span className="text-main-color text-5xl">The Cologne Hub</span></h1>
-          <p className="text-wrap text-lg">Discover premium fragrances that define your signature style. The Cologne Hub brings you carefully curated scents from around the world, each bottle telling its own unique story of elegance and sophistication.</p>
+       <div className="flex flex-col gap-4 w-full max-w-2xl px-4 md:ml-[5%] md:px-0 relative z-10">
+          <small className="font-bold text-2xl md:text-3xl text-main-color">Hey, {username ? username : ''}</small>
+          <h1 className="font-bold text-3xl md:text-4xl leading-tight">Welcome to <span className="text-main-color text-3xl md:text-5xl block md:inline">The Cologne Hub</span></h1>
+          <p className="text-wrap text-base md:text-lg">Discover premium fragrances that define your signature style. The Cologne Hub brings you carefully curated scents from around the world, each bottle telling its own unique story of elegance and sophistication.</p>
           <button
              onClick={handleShopNavigate}
             className="px-8 py-3 bg-main-color rounded-full text-white border border-main-color transition-colors max-w-44 hover:bg-white hover:text-main-color relative z-10 text-lg"
             >Shop Now</button>
       </div>
         
-      <div className="relative z-10">
+      {/* Image - Hidden on mobile, visible on medium screens and up */}
+      <div className="relative z-10 hidden md:block">
           <img src={imgright} alt="image" className="h-[28rem] drop-shadow-2xl shadow-black/50 filter brightness-50 contrast-125"/>
         </div>
 

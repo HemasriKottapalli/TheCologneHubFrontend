@@ -154,9 +154,9 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
     { name: 'Orders', path: '/orders' },
   ];
 
-  // User Profile Dropdown Component (reusable for both user and admin)
+  // User Profile Dropdown Component (only visible on desktop - hidden on mobile)
   const UserProfileDropdown = () => (
-    <div className="relative group">
+    <div className="relative group hidden md:block">
       <button className="flex items-center space-x-2 p-2 text-gray-700 hover:text-main-color transition-colors duration-200">
         <FiUser size={20} />
         <span className="hidden lg:block text-sm font-medium">
@@ -296,7 +296,7 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
                   count={wishlistItemCount}
                 />
 
-                {/* Profile Dropdown */}
+                {/* Profile Dropdown - Hidden on mobile */}
                 <UserProfileDropdown />
               </>
             ) : (
@@ -384,6 +384,7 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
                 )}
               </Link>
               
+              {/* Profile link in mobile menu */}
               <Link
                 to="/profile"
                 className={`block px-3 py-2 rounded-md transition-colors duration-200 ${
@@ -395,7 +396,10 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
               >
                 Profile
               </Link>
+              
               <hr className="my-2" />
+              
+              {/* Logout button in mobile menu */}
               <button
                 onClick={handleLogout}
                 className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 flex items-center space-x-2"
