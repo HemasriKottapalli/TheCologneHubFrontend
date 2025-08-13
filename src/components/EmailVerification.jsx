@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FiMail, FiCheckCircle, FiXCircle, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
 import API from '../api';
-// import API from '../utils/api';
  
 const EmailVerification = () => {
   const [token, setToken] = useState('');
@@ -9,6 +8,7 @@ const EmailVerification = () => {
   const [message, setMessage] = useState('');
   const [username, setUsername] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [countdown, setCountdown] = useState(3);
  
   useEffect(() => {
     // Get token from URL parameters
@@ -23,20 +23,49 @@ const EmailVerification = () => {
       setMessage('No verification token provided');
     }
   }, []);
+
+  // Countdown effect for auto-redirect
+  useEffect(() => {
+    let interval = null;
+    if (status === 'success' && countdown > 0) {
+      interval = setInterval(() => {
+        setCountdown(countdown => countdown - 1);
+      }, 1000);
+    } else if (countdown === 0) {
+      handleSuccessfulLogin();
+    }
+    return () => clearInterval(interval);
+  }, [status, countdown]);
  
   const verifyEmailToken = async (tokenToVerify) => {
     try {
       setIsLoading(true);
       const response = await API.get(`/api/auth/verify-email/${tokenToVerify}`);
      
-      setStatus('success');
-      setMessage(response.data.message);
-      setUsername(response.data.username);
-     
-      // Auto redirect to home page after 3 seconds
-      setTimeout(() => {
-        window.location.href = '/?verified=true';
-      }, 3000);
+      if (response.data.success) {
+        setStatus('success');
+        setMessage(response.data.message);
+        setUsername(response.data.username);
+        
+        // Store authentication data in localStorage
+        if (response.data.token) {
+          localStorage.setItem('token', response.data.token);
+          localStorage.setItem('role', response.data.role);
+          localStorage.setItem('username', response.data.username);
+          localStorage.setItem('email', response.data.email);
+          localStorage.setItem('isEmailVerified', 'true');
+          
+          // Trigger header update events
+          window.dispatchEvent(new Event('usernameChanged'));
+          window.dispatchEvent(new CustomEvent('userLoggedIn'));
+          window.dispatchEvent(new CustomEvent('loginSuccess', {
+            detail: { role: response.data.role }
+          }));
+        }
+        
+        // Start countdown for auto-redirect
+        setCountdown(3);
+      }
      
     } catch (error) {
       if (error.response?.data?.expired) {
@@ -50,11 +79,17 @@ const EmailVerification = () => {
       setIsLoading(false);
     }
   };
+
+  const handleSuccessfulLogin = () => {
+    // Navigate to home page with verification success indicator
+    window.location.href = '/?verified=true';
+  };
  
   const handleRetryVerification = () => {
     if (token) {
       setStatus('verifying');
       setMessage('');
+      setCountdown(3);
       verifyEmailToken(token);
     }
   };
@@ -107,13 +142,27 @@ const EmailVerification = () => {
           {/* Status Message */}
           <div className={`p-4 rounded-lg border mb-6 ${getStatusColor()}`}>
             {status === 'verifying' && isLoading && (
-              <p>Verifying your email address...</p>
+              <div>
+                <h3 className="font-semibold mb-2">Verifying Your Email...</h3>
+                <p>Please wait while we verify your email address.</p>
+              </div>
             )}
             {status === 'success' && (
               <div>
-                <h3 className="font-semibold mb-2">Email Verified Successfully! 🎉</h3>
-                {username && <p className="mb-2">Welcome to The Cologne Hub, {username}!</p>}
-                <p className="text-sm">Redirecting you to home page in a few seconds...</p>
+                <h3 className="font-semibold mb-2">🎉 Email Verified Successfully!</h3>
+                {username && <p className="mb-2">Welcome to The Cologne Hub, <span className="font-semibold text-main-color">{username}</span>!</p>}
+                <p className="text-sm mb-3">You are now logged in and have full access to your account.</p>
+                <div className="bg-white rounded-lg p-3 border border-green-300">
+                  <p className="text-sm font-medium">
+                    Redirecting to home page in {countdown} second{countdown !== 1 ? 's' : ''}...
+                  </p>
+                  <div className="w-full bg-gray-200 rounded-full h-2 mt-2">
+                    <div 
+                      className="bg-main-color h-2 rounded-full transition-all duration-1000 ease-linear"
+                      style={{ width: `${((3 - countdown) / 3) * 100}%` }}
+                    ></div>
+                  </div>
+                </div>
               </div>
             )}
             {(status === 'error' || status === 'expired') && (
@@ -130,11 +179,11 @@ const EmailVerification = () => {
           <div className="space-y-3">
             {status === 'success' && (
               <button
-                onClick={() => window.location.href = '/?verified=true'}
+                onClick={handleSuccessfulLogin}
                 className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200 flex items-center justify-center"
               >
                 <FiCheckCircle className="mr-2" size={18} />
-                Continue to Home
+                Continue to Home (Skip Wait)
               </button>
             )}
  
@@ -196,5 +245,4 @@ const EmailVerification = () => {
   );
 };
  
-export default EmailVerification;  
- 
+export default EmailVerification;

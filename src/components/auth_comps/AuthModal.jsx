@@ -42,6 +42,39 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowPassword(false);
     setShowConfirmPassword(false);
   }, [modalType]);
+
+useEffect(() => {
+  const handleStorageChange = () => {
+    // Check if user just got verified and logged in
+    const isVerified = localStorage.getItem('isEmailVerified');
+    const token = localStorage.getItem('token');
+    
+    if (isVerified === 'true' && token && modalType === 'emailVerification') {
+      // User just got verified, close the modal
+      setSuccess('Email verified successfully! You are now logged in.');
+      setTimeout(() => {
+        onClose();
+        // Trigger any pending actions if they exist
+        const pendingAction = getPendingAction();
+        if (pendingAction) {
+          window.dispatchEvent(new CustomEvent('executePendingAction', {
+            detail: pendingAction
+          }));
+        }
+      }, 1500);
+    }
+  };
+
+  // Listen for storage changes (when verification happens in another tab)
+  window.addEventListener('storage', handleStorageChange);
+  
+  // Also check on mount
+  handleStorageChange();
+  
+  return () => {
+    window.removeEventListener('storage', handleStorageChange);
+  };
+}, [modalType, onClose]);
  
   // Handle ESC key
   useEffect(() => {
@@ -221,96 +254,102 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   if (!isOpen) return null;
  
   // Email Verification View
-  if (modalType === 'emailVerification') {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
-        <div
-          className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
-          onClick={onClose}
-        />
-       
-        <div className="relative w-full mx-4 max-w-md max-h-[90vh] overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+if (modalType === 'emailVerification') {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div
+        className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
+        onClick={onClose}
+      />
+     
+      <div className="relative w-full mx-4 max-w-md max-h-[90vh] overflow-y-auto">
+        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+          >
+            <FiX size={24} />
+          </button>
+
+          <div className="text-center mb-6">
+            <div className="mb-4">
+              <FiMail className="h-16 w-16 text-main-color mx-auto" />
+            </div>
+            <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color mb-2">
+              Check Your Email
+            </h1>
+            <p className="text-gray-600 text-sm">
+              We've sent a verification link to
+            </p>
+            <p className="font-medium text-gray-800 break-words">
+              {verificationEmail}
+            </p>
+          </div>
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
+              {success}
+            </div>
+          )}
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
+            <p className="font-medium mb-2">📧 What happens next:</p>
+            <ul className="text-xs space-y-1">
+              <li>1. Check your email inbox (including spam folder)</li>
+              <li>2. Click the "Verify My Email" button in the email</li>
+              <li>3. You'll be automatically logged in</li>
+              <li>4. This window will close automatically</li>
+            </ul>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6 text-xs">
+            <p className="font-medium mb-1">💡 Pro Tip:</p>
+            <p>Keep this window open while you check your email. When you click the verification link, you'll be automatically logged in and this window will close.</p>
+          </div>
+
+          <div className="space-y-3">
             <button
-              onClick={onClose}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+              onClick={handleResendVerificationEmail}
+              disabled={isResendingEmail}
+              className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
             >
-              <FiX size={24} />
+              {isResendingEmail ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <FiRefreshCw className="mr-2" size={18} />
+                  Resend Email
+                </>
+              )}
             </button>
- 
-            <div className="text-center mb-6">
-              <div className="mb-4">
-                <FiMail className="h-16 w-16 text-main-color mx-auto" />
-              </div>
-              <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color mb-2">
-                Check Your Email
-              </h1>
-              <p className="text-gray-600 text-sm">
-                We've sent a verification link to
-              </p>
-              <p className="font-medium text-gray-800 break-words">
-                {verificationEmail}
-              </p>
-            </div>
- 
-            {success && (
-              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
-                {success}
-              </div>
-            )}
- 
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-                {error}
-              </div>
-            )}
- 
-            <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
-              <p className="font-medium mb-1">Next Steps:</p>
-              <ul className="text-xs space-y-1">
-                <li>1. Check your email inbox (including spam folder)</li>
-                <li>2. Click the verification link in the email</li>
-                <li>3. Return here to log in</li>
-              </ul>
-            </div>
- 
-            <div className="space-y-3">
-              <button
-                onClick={handleResendVerificationEmail}
-                disabled={isResendingEmail}
-                className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-              >
-                {isResendingEmail ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <FiRefreshCw className="mr-2" size={18} />
-                    Resend Email
-                  </>
-                )}
-              </button>
-             
-              <button
-                onClick={() => setModalType('login')}
-                className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
-              >
-                Back to Login
-              </button>
-            </div>
- 
-            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-              <p className="text-xs text-gray-500">
-                Didn't receive the email? Check your spam folder or try resending.
-              </p>
-            </div>
+           
+            <button
+              onClick={() => setModalType('login')}
+              className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
+            >
+              Back to Login
+            </button>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+            <p className="text-xs text-gray-500">
+              The verification link will expire in 24 hours for security.
+            </p>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
  
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
