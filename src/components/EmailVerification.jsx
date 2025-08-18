@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FiMail, FiCheckCircle, FiXCircle, FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
 import API from '../api';
  
-const EmailVerification = () => {
+const EmailVerificationPage = () => {
   const [token, setToken] = useState('');
   const [status, setStatus] = useState('verifying'); // verifying, success, error, expired
   const [message, setMessage] = useState('');
@@ -40,7 +40,12 @@ const EmailVerification = () => {
   const verifyEmailToken = async (tokenToVerify) => {
     try {
       setIsLoading(true);
+      setStatus('verifying');
+      
+      // FIXED: Use correct API endpoint
       const response = await API.get(`/api/auth/verify-email/${tokenToVerify}`);
+     
+      console.log('Verification response:', response.data);
      
       if (response.data.success) {
         setStatus('success');
@@ -54,23 +59,50 @@ const EmailVerification = () => {
           localStorage.setItem('username', response.data.username);
           localStorage.setItem('email', response.data.email);
           localStorage.setItem('isEmailVerified', 'true');
+          localStorage.setItem('justVerified', 'true');
           
           // Trigger header update events
           window.dispatchEvent(new Event('usernameChanged'));
           window.dispatchEvent(new CustomEvent('userLoggedIn'));
+          
+          // Trigger success event with user data
           window.dispatchEvent(new CustomEvent('loginSuccess', {
             detail: { role: response.data.role }
           }));
+          
+          // For cross-tab communication
+          window.dispatchEvent(new Event('storage'));
+          
+          // Send message to parent window if opened in popup/new tab
+          if (window.opener) {
+            window.opener.postMessage({
+              type: 'EMAIL_VERIFIED',
+              data: {
+                token: response.data.token,
+                role: response.data.role,
+                username: response.data.username,
+                email: response.data.email
+              }
+            }, '*');
+          }
         }
         
         // Start countdown for auto-redirect
         setCountdown(3);
+      } else {
+        setStatus('error');
+        setMessage(response.data.message || 'Verification failed');
       }
      
     } catch (error) {
+      console.error('Verification error:', error);
+      
       if (error.response?.data?.expired) {
         setStatus('expired');
         setMessage(error.response.data.message);
+      } else if (error.response?.data?.success === false) {
+        setStatus(error.response.data.expired ? 'expired' : 'error');
+        setMessage(error.response.data.message || 'Verification failed');
       } else {
         setStatus('error');
         setMessage(error.response?.data?.message || 'Verification failed');
@@ -81,8 +113,13 @@ const EmailVerification = () => {
   };
 
   const handleSuccessfulLogin = () => {
-    // Navigate to home page with verification success indicator
-    window.location.href = '/?verified=true';
+    // Clean up URL parameters
+    const url = new URL(window.location);
+    url.search = '';
+    window.history.replaceState({}, document.title, url.pathname);
+    
+    // Navigate to home page
+    window.location.href = '/';
   };
  
   const handleRetryVerification = () => {
@@ -149,7 +186,7 @@ const EmailVerification = () => {
             )}
             {status === 'success' && (
               <div>
-                <h3 className="font-semibold mb-2">🎉 Email Verified Successfully!</h3>
+                <h3 className="font-semibold mb-2">Email Verified Successfully!</h3>
                 {username && <p className="mb-2">Welcome to The Cologne Hub, <span className="font-semibold text-main-color">{username}</span>!</p>}
                 <p className="text-sm mb-3">You are now logged in and have full access to your account.</p>
                 <div className="bg-white rounded-lg p-3 border border-green-300">
@@ -245,4 +282,4 @@ const EmailVerification = () => {
   );
 };
  
-export default EmailVerification;
+export default EmailVerificationPage;
