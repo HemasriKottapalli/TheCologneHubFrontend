@@ -40,7 +40,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowConfirmPassword(false);
   }, [modalType]);
 
-  // Enhanced verification event listeners
   useEffect(() => {
     const handleStorageChange = () => {
       const isVerified = localStorage.getItem('isEmailVerified');
@@ -311,7 +310,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                   <ul className="text-xs space-y-1">
                     <li>1. Check your email inbox (including spam folder)</li>
                     <li>2. Click the "Verify My Email" button in the email</li>
-                    <li>3. This window will automatically log you in</li>
+                    <li>3. You will be automatically logged in here</li>
                   </ul>
                 </div>
               </>
