@@ -4,7 +4,7 @@ import API from '../../api';
 import { getPendingAction } from '../../utils/authUtils';
 
 const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
-  const [modalType, setModalType] = useState(initialType); // 'login', 'register', 'emailVerification'
+  const [modalType, setModalType] = useState(initialType);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [registerForm, setRegisterForm] = useState({
     username: '',
@@ -18,14 +18,11 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
-  const [isResendingEmail, setIsResendingEmail] = useState(false);
 
-  // Reset when modal opens/closes or type changes
   useEffect(() => {
     if (isOpen) {
       setModalType(initialType);
     } else {
-      // Reset everything when modal closes
       setLoginForm({ username: '', password: '' });
       setRegisterForm({ username: '', email: '', password: '', confirmPassword: '' });
       setError('');
@@ -43,30 +40,22 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowConfirmPassword(false);
   }, [modalType]);
 
-  // FIXED: Enhanced verification event listeners
+  // Enhanced verification event listeners
   useEffect(() => {
     const handleStorageChange = () => {
-      // Check if user just got verified and logged in
       const isVerified = localStorage.getItem('isEmailVerified');
       const token = localStorage.getItem('token');
       const justVerified = localStorage.getItem('justVerified');
       
       if (isVerified === 'true' && token && justVerified === 'true' && modalType === 'emailVerification') {
-        console.log("User verified via storage change");
-        
-        // Clear the flag
         localStorage.removeItem('justVerified');
-        
-        // Show success message
         setSuccess('Email verified successfully! You are now logged in.');
         
-        // Trigger header updates
         window.dispatchEvent(new Event('usernameChanged'));
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
         
         setTimeout(() => {
           onClose();
-          // Trigger any pending actions if they exist
           const pendingAction = getPendingAction();
           if (pendingAction) {
             window.dispatchEvent(new CustomEvent('executePendingAction', {
@@ -81,28 +70,17 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       }
     };
 
-    // Listen for storage changes (when verification happens in same tab)
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Listen for postMessage events (when verification happens in new tab)
     const handleMessage = (event) => {
-      console.log("Received postMessage:", event.data);
-      
       if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
         const userData = event.data.data;
-        console.log("Processing email verified message:", userData);
-        
-        // Store the data
         localStorage.setItem('token', userData.token);
         localStorage.setItem('role', userData.role);
         localStorage.setItem('username', userData.username);
         localStorage.setItem('email', userData.email);
         localStorage.setItem('isEmailVerified', 'true');
         
-        // Show success and close modal
         setSuccess('Email verified successfully! You are now logged in.');
         
-        // Trigger header updates
         window.dispatchEvent(new Event('usernameChanged'));
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
         
@@ -122,9 +100,8 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       }
     };
     
+    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('message', handleMessage);
-    
-    // Also check on mount
     handleStorageChange();
     
     return () => {
@@ -133,34 +110,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     };
   }, [modalType, onClose]);
 
-  // FIXED: Enhanced URL verification check
-  useEffect(() => {
-    if (isOpen) {
-      // Check URL parameters for verification success
-      const urlParams = new URLSearchParams(window.location.search);
-      const verified = urlParams.get('verified');
-      const emailVerified = urlParams.get('emailVerified');
-      
-      if ((verified === 'true' || emailVerified === 'true') && localStorage.getItem('token')) {
-        console.log("User verified via URL params");
-        
-        // User just completed verification, show success and close modal
-        setSuccess('Welcome! Your email has been verified and you are now logged in.');
-        
-        // Clean up URL
-        const url = new URL(window.location);
-        url.searchParams.delete('verified');
-        url.searchParams.delete('emailVerified');
-        window.history.replaceState({}, document.title, url.pathname + url.search);
-        
-        setTimeout(() => {
-          onClose();
-        }, 2000);
-      }
-    }
-  }, [isOpen, onClose]);
-
-  // Handle ESC key
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.keyCode === 27) onClose();
@@ -177,12 +126,12 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
 
   const handleLoginChange = (e) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
-    if (error) setError('');
+    setError('');
   };
 
   const handleRegisterChange = (e) => {
     setRegisterForm({ ...registerForm, [e.target.name]: e.target.value });
-    if (error) setError('');
+    setError('');
   };
 
   const validateRegisterForm = () => {
@@ -210,20 +159,16 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       localStorage.setItem('email', res.data.email);
       localStorage.setItem('isEmailVerified', res.data.isEmailVerified);
       
-      // Trigger events
       window.dispatchEvent(new Event('usernameChanged'));
       window.dispatchEvent(new CustomEvent('userLoggedIn'));
 
-      // Close modal
       onClose();
 
-      // Check if user is admin and redirect to products page
       if (res.data.role === 'admin') {
         window.location.href = '/admin';
         return;
       }
 
-      // Check for pending actions and execute them
       const pendingAction = getPendingAction();
       if (pendingAction) {
         window.dispatchEvent(new CustomEvent('executePendingAction', {
@@ -250,7 +195,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
-   
     if (!validateRegisterForm()) return;
 
     setIsLoading(true);
@@ -263,30 +207,17 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
         email: registerForm.email,
         password: registerForm.password
       });
-     
-      console.log('Registration response:', response.data);
-     
+      
       setVerificationEmail(registerForm.email);
-     
+      
       if (response.data.success) {
-        if (response.data.emailSent) {
-          setSuccess(response.data.message);
-          // Switch to email verification view immediately
-          setTimeout(() => {
-            setModalType('emailVerification');
-            setSuccess('');
-          }, 1500);
-        } else {
-          // Registration successful but email failed
-          setSuccess(response.data.message);
-          setTimeout(() => {
-            setModalType('emailVerification');
-            setSuccess('');
-          }, 2000);
-        }
+        setSuccess(response.data.message);
+        setTimeout(() => {
+          setModalType('emailVerification');
+          setSuccess('');
+        }, 1500);
       }
     } catch (err) {
-      console.error('Registration error:', err);
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
@@ -294,48 +225,25 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   };
 
   const handleResendVerificationEmail = async () => {
-    setIsResendingEmail(true);
+    setIsLoading(true);
     setError('');
     setSuccess('');
 
     try {
-      console.log('Resending verification email to:', verificationEmail);
-     
       const response = await API.post('/api/auth/resend-verification', {
         email: verificationEmail
       });
-     
-      console.log('Resend response:', response.data);
-     
+      
       if (response.data.success) {
         setSuccess(response.data.message);
       } else {
         setError(response.data.message || 'Failed to resend verification email.');
       }
     } catch (err) {
-      console.error('Resend error:', err);
-     
-      // Provide more specific error messages
-      let errorMessage = 'Failed to resend verification email.';
-     
-      if (err.response?.status === 500) {
-        errorMessage = 'Server error occurred. Please try again in a few minutes.';
-      } else if (err.response?.status === 404) {
-        errorMessage = 'Email address not found. Please register first.';
-      } else if (err.response?.data?.message) {
-        errorMessage = err.response.data.message;
-      }
-     
-      setError(errorMessage);
+      setError(err.response?.data?.message || 'Failed to resend verification email.');
     } finally {
-      setIsResendingEmail(false);
+      setIsLoading(false);
     }
-  };
-
-  // FIXED: Open verification link in new tab to prevent losing current context
-  const openVerificationInNewTab = () => {
-    const verifyUrl = `/verify-email?email=${encodeURIComponent(verificationEmail)}`;
-    window.open(verifyUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
   };
 
   const switchModalType = () => {
@@ -344,7 +252,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
 
   if (!isOpen) return null;
 
-  // Email Verification View
   if (modalType === 'emailVerification') {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -352,7 +259,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
           className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
           onClick={onClose}
         />
-       
         <div className="relative w-full mx-4 max-w-md max-h-[90vh] overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
             <button
@@ -405,48 +311,32 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                   <ul className="text-xs space-y-1">
                     <li>1. Check your email inbox (including spam folder)</li>
                     <li>2. Click the "Verify My Email" button in the email</li>
-                    <li>3. You'll be automatically logged in</li>
-                    <li>4. Return to this page to continue</li>
+                    <li>3. This window will automatically log you in</li>
                   </ul>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6 text-xs">
-                  <p className="font-medium mb-1">Pro Tip:</p>
-                  <p>Keep this window open while you check your email. After clicking the verification link, return here and this window will automatically detect your verification.</p>
                 </div>
               </>
             )}
 
             <div className="space-y-3">
               {!success && (
-                <>
-                  <button
-                    onClick={handleResendVerificationEmail}
-                    disabled={isResendingEmail}
-                    className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                  >
-                    {isResendingEmail ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                        Sending...
-                      </>
-                    ) : (
-                      <>
-                        <FiRefreshCw className="mr-2" size={18} />
-                        Resend Email
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    onClick={openVerificationInNewTab}
-                    className="w-full border border-gray-300 text-gray-600 py-3 px-4 rounded-lg font-medium hover:bg-gray-50 transition-colors duration-200"
-                  >
-                    Open Verification Page
-                  </button>
-                </>
+                <button
+                  onClick={handleResendVerificationEmail}
+                  disabled={isLoading}
+                  className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                >
+                  {isLoading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <FiRefreshCw className="mr-2" size={18} />
+                      Resend Email
+                    </>
+                  )}
+                </button>
               )}
-             
               <button
                 onClick={() => setModalType('login')}
                 className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
@@ -470,18 +360,12 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
-     
-      {/* Modal */}
-      <div className={`relative w-full mx-4 max-h-[90vh] overflow-y-auto ${
-        modalType === 'register' ? 'max-w-lg' : 'max-w-md'
-      }`}>
+      <div className={`relative w-full mx-4 max-h-[90vh] overflow-y-auto ${modalType === 'register' ? 'max-w-lg' : 'max-w-md'}`}>
         <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          {/* Close Button */}
           <button
             onClick={onClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
@@ -489,37 +373,29 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
             <FiX size={24} />
           </button>
 
-          {/* Header */}
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color">
               The Cologne Hub
             </h1>
             <p className="text-gray-600 text-sm mt-2">
-              {modalType === 'login'
-                ? 'Welcome back to your fragrance journey'
-                : 'Join our fragrance community'
-              }
+              {modalType === 'login' ? 'Welcome back to your fragrance journey' : 'Join our fragrance community'}
             </p>
           </div>
 
-          {/* Success Message */}
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
               {success}
             </div>
           )}
 
-          {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
               {error}
             </div>
           )}
 
-          {/* Login Form */}
           {modalType === 'login' && (
             <div className="space-y-4">
-              {/* Username Field */}
               <div className="relative">
                 <label htmlFor="modal-username" className="block text-sm font-medium text-gray-700 mb-2">
                   Username or Email
@@ -541,7 +417,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </div>
               </div>
 
-              {/* Password Field */}
               <div className="relative">
                 <label htmlFor="modal-password" className="block text-sm font-medium text-gray-700 mb-2">
                   Password
@@ -570,7 +445,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </div>
               </div>
 
-              {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center">
                   <input
@@ -584,7 +458,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </a>
               </div>
 
-              {/* Login Button */}
               <button
                 onClick={handleLoginSubmit}
                 disabled={isLoading}
@@ -602,12 +475,9 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
             </div>
           )}
 
-          {/* Register Form */}
           {modalType === 'register' && (
             <div className="space-y-5">
-              {/* Two columns for username and email on larger screens */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Username Field */}
                 <div className="relative">
                   <label htmlFor="modal-reg-username" className="block text-sm font-medium text-gray-700 mb-2">
                     Username
@@ -629,7 +499,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                   </div>
                 </div>
 
-                {/* Email Field */}
                 <div className="relative">
                   <label htmlFor="modal-email" className="block text-sm font-medium text-gray-700 mb-2">
                     Email Address
@@ -652,9 +521,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </div>
               </div>
 
-              {/* Two columns for passwords on larger screens */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Password Field */}
                 <div className="relative">
                   <label htmlFor="modal-reg-password" className="block text-sm font-medium text-gray-700 mb-2">
                     Password
@@ -682,7 +549,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                       {showPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                     </button>
                   </div>
-                  {/* Password strength indicator */}
                   {registerForm.password && (
                     <div className="mt-1">
                       <div className="text-xs text-gray-500">
@@ -692,7 +558,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                   )}
                 </div>
 
-                {/* Confirm Password Field */}
                 <div className="relative">
                   <label htmlFor="modal-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
                     Confirm Password
@@ -719,14 +584,9 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                       {showConfirmPassword ? <FiEyeOff size={18} /> : <FiEye size={18} />}
                     </button>
                   </div>
-                  {/* Password match indicator */}
                   {registerForm.confirmPassword && (
                     <div className="mt-1">
-                      <div className={`text-xs ${
-                        registerForm.password === registerForm.confirmPassword
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                      }`}>
+                      <div className={`text-xs ${registerForm.password === registerForm.confirmPassword ? 'text-green-600' : 'text-red-600'}`}>
                         {registerForm.password === registerForm.confirmPassword ? 'Passwords match' : 'Passwords do not match'}
                       </div>
                     </div>
@@ -734,7 +594,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </div>
               </div>
 
-              {/* Terms & Conditions - Full width */}
               <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
                 <input
                   type="checkbox"
@@ -754,7 +613,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </label>
               </div>
 
-              {/* Register Button */}
               <button
                 onClick={handleRegisterSubmit}
                 disabled={isLoading}
@@ -772,7 +630,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
             </div>
           )}
 
-          {/* Switch between Login/Register */}
           <div className="mt-6 text-center">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
