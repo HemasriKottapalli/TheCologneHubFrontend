@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FiUser, FiLock, FiEye, FiEyeOff, FiMail, FiX, FiRefreshCw, FiCheckCircle } from 'react-icons/fi';
 import API from '../../api';
 import { getPendingAction } from '../../utils/authUtils';
- 
+
 const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [modalType, setModalType] = useState(initialType); // 'login', 'register', 'emailVerification'
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
@@ -19,7 +19,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [success, setSuccess] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
   const [isResendingEmail, setIsResendingEmail] = useState(false);
- 
+
   // Reset when modal opens/closes or type changes
   useEffect(() => {
     if (isOpen) {
@@ -35,7 +35,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setVerificationEmail('');
     }
   }, [isOpen, initialType]);
- 
+
   useEffect(() => {
     setError('');
     setSuccess('');
@@ -43,7 +43,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowConfirmPassword(false);
   }, [modalType]);
 
-  // FIXED: Listen for verification events
+  // FIXED: Enhanced verification event listeners
   useEffect(() => {
     const handleStorageChange = () => {
       // Check if user just got verified and logged in
@@ -52,6 +52,8 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       const justVerified = localStorage.getItem('justVerified');
       
       if (isVerified === 'true' && token && justVerified === 'true' && modalType === 'emailVerification') {
+        console.log("User verified via storage change");
+        
         // Clear the flag
         localStorage.removeItem('justVerified');
         
@@ -84,8 +86,11 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     
     // Listen for postMessage events (when verification happens in new tab)
     const handleMessage = (event) => {
+      console.log("Received postMessage:", event.data);
+      
       if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
         const userData = event.data.data;
+        console.log("Processing email verified message:", userData);
         
         // Store the data
         localStorage.setItem('token', userData.token);
@@ -128,20 +133,24 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     };
   }, [modalType, onClose]);
 
-  // FIXED: Check for verification success on page load
+  // FIXED: Enhanced URL verification check
   useEffect(() => {
     if (isOpen) {
       // Check URL parameters for verification success
       const urlParams = new URLSearchParams(window.location.search);
       const verified = urlParams.get('verified');
+      const emailVerified = urlParams.get('emailVerified');
       
-      if (verified === 'true' && localStorage.getItem('token')) {
+      if ((verified === 'true' || emailVerified === 'true') && localStorage.getItem('token')) {
+        console.log("User verified via URL params");
+        
         // User just completed verification, show success and close modal
         setSuccess('Welcome! Your email has been verified and you are now logged in.');
         
         // Clean up URL
         const url = new URL(window.location);
         url.searchParams.delete('verified');
+        url.searchParams.delete('emailVerified');
         window.history.replaceState({}, document.title, url.pathname + url.search);
         
         setTimeout(() => {
@@ -150,7 +159,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       }
     }
   }, [isOpen, onClose]);
- 
+
   // Handle ESC key
   useEffect(() => {
     const handleEsc = (e) => {
@@ -165,17 +174,17 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
- 
+
   const handleLoginChange = (e) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
     if (error) setError('');
   };
- 
+
   const handleRegisterChange = (e) => {
     setRegisterForm({ ...registerForm, [e.target.name]: e.target.value });
     if (error) setError('');
   };
- 
+
   const validateRegisterForm = () => {
     if (registerForm.password !== registerForm.confirmPassword) {
       setError('Passwords do not match');
@@ -187,32 +196,33 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     }
     return true;
   };
- 
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
- 
+
     try {
       const res = await API.post('/api/auth/login', loginForm);
       localStorage.setItem('token', res.data.token);
       localStorage.setItem('role', res.data.role);
       localStorage.setItem('username', res.data.username);
-      window.dispatchEvent(new Event('usernameChanged'));
       localStorage.setItem('email', res.data.email);
- 
-      // Trigger header update
+      localStorage.setItem('isEmailVerified', res.data.isEmailVerified);
+      
+      // Trigger events
+      window.dispatchEvent(new Event('usernameChanged'));
       window.dispatchEvent(new CustomEvent('userLoggedIn'));
- 
-      // Close modal - user stays on current page!
+
+      // Close modal
       onClose();
- 
+
       // Check if user is admin and redirect to products page
       if (res.data.role === 'admin') {
         window.location.href = '/admin';
         return;
       }
- 
+
       // Check for pending actions and execute them
       const pendingAction = getPendingAction();
       if (pendingAction) {
@@ -220,11 +230,11 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
           detail: pendingAction
         }));
       }
- 
+
       window.dispatchEvent(new CustomEvent('loginSuccess', {
         detail: { role: res.data.role }
       }));
- 
+
     } catch (err) {
       if (err.response?.data?.emailVerificationRequired) {
         setError('Please verify your email before logging in.');
@@ -237,16 +247,16 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setIsLoading(false);
     }
   };
- 
+
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
    
     if (!validateRegisterForm()) return;
- 
+
     setIsLoading(true);
     setError('');
     setSuccess('');
- 
+
     try {
       const response = await API.post('/api/auth/register', {
         username: registerForm.username,
@@ -282,12 +292,12 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setIsLoading(false);
     }
   };
- 
+
   const handleResendVerificationEmail = async () => {
     setIsResendingEmail(true);
     setError('');
     setSuccess('');
- 
+
     try {
       console.log('Resending verification email to:', verificationEmail);
      
@@ -321,128 +331,143 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setIsResendingEmail(false);
     }
   };
- 
+
+  // FIXED: Open verification link in new tab to prevent losing current context
+  const openVerificationInNewTab = () => {
+    const verifyUrl = `/verify-email?email=${encodeURIComponent(verificationEmail)}`;
+    window.open(verifyUrl, '_blank', 'width=600,height=700,scrollbars=yes,resizable=yes');
+  };
+
   const switchModalType = () => {
     setModalType(modalType === 'login' ? 'register' : 'login');
   };
- 
-  if (!isOpen) return null;
- 
-  // Email Verification View
-if (modalType === 'emailVerification') {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div
-        className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
-        onClick={onClose}
-      />
-     
-      <div className="relative w-full mx-4 max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <FiX size={24} />
-          </button>
 
-          <div className="text-center mb-6">
-            <div className="mb-4">
-              {success ? (
-                <FiCheckCircle className="h-16 w-16 text-green-500 mx-auto" />
-              ) : (
-                <FiMail className="h-16 w-16 text-main-color mx-auto" />
+  if (!isOpen) return null;
+
+  // Email Verification View
+  if (modalType === 'emailVerification') {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity"
+          onClick={onClose}
+        />
+       
+        <div className="relative w-full mx-4 max-w-md max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl p-6 md:p-8">
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <FiX size={24} />
+            </button>
+
+            <div className="text-center mb-6">
+              <div className="mb-4">
+                {success ? (
+                  <FiCheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+                ) : (
+                  <FiMail className="h-16 w-16 text-main-color mx-auto" />
+                )}
+              </div>
+              <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color mb-2">
+                {success ? 'Success!' : 'Check Your Email'}
+              </h1>
+              {!success && (
+                <>
+                  <p className="text-gray-600 text-sm">
+                    We've sent a verification link to
+                  </p>
+                  <p className="font-medium text-gray-800 break-words">
+                    {verificationEmail}
+                  </p>
+                </>
               )}
             </div>
-            <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color mb-2">
-              {success ? 'Success!' : 'Check Your Email'}
-            </h1>
+
+            {success && (
+              <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm text-center">
+                <FiCheckCircle className="inline mr-2" />
+                {success}
+              </div>
+            )}
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
+                {error}
+              </div>
+            )}
+
             {!success && (
               <>
-                <p className="text-gray-600 text-sm">
-                  We've sent a verification link to
-                </p>
-                <p className="font-medium text-gray-800 break-words">
-                  {verificationEmail}
-                </p>
+                <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
+                  <p className="font-medium mb-2">What happens next:</p>
+                  <ul className="text-xs space-y-1">
+                    <li>1. Check your email inbox (including spam folder)</li>
+                    <li>2. Click the "Verify My Email" button in the email</li>
+                    <li>3. You'll be automatically logged in</li>
+                    <li>4. Return to this page to continue</li>
+                  </ul>
+                </div>
+
+                <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6 text-xs">
+                  <p className="font-medium mb-1">Pro Tip:</p>
+                  <p>Keep this window open while you check your email. After clicking the verification link, return here and this window will automatically detect your verification.</p>
+                </div>
               </>
             )}
-          </div>
 
-          {success && (
-            <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm text-center">
-              <FiCheckCircle className="inline mr-2" />
-              {success}
-            </div>
-          )}
+            <div className="space-y-3">
+              {!success && (
+                <>
+                  <button
+                    onClick={handleResendVerificationEmail}
+                    disabled={isResendingEmail}
+                    className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isResendingEmail ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <FiRefreshCw className="mr-2" size={18} />
+                        Resend Email
+                      </>
+                    )}
+                  </button>
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          {!success && (
-            <>
-              <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
-                <p className="font-medium mb-2">What happens next:</p>
-                <ul className="text-xs space-y-1">
-                  <li>1. Check your email inbox (including spam folder)</li>
-                  <li>2. Click the "Verify My Email" button in the email</li>
-                  <li>3. You'll be automatically logged in</li>
-                  <li>4. This window will update to show success</li>
-                </ul>
-              </div>
-
-              <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-lg mb-6 text-xs">
-                <p className="font-medium mb-1">Pro Tip:</p>
-                <p>Keep this window open while you check your email. When you click the verification link, you'll be automatically logged in and this window will show your success.</p>
-              </div>
-            </>
-          )}
-
-          <div className="space-y-3">
-            {!success && (
+                  <button
+                    onClick={openVerificationInNewTab}
+                    className="w-full border border-gray-300 text-gray-600 py-3 px-4 rounded-lg font-medium hover:bg-gray-50 transition-colors duration-200"
+                  >
+                    Open Verification Page
+                  </button>
+                </>
+              )}
+             
               <button
-                onClick={handleResendVerificationEmail}
-                disabled={isResendingEmail}
-                className="w-full border border-main-color text-main-color py-3 px-4 rounded-lg font-medium hover:bg-main-color hover:text-white transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                onClick={() => setModalType('login')}
+                className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
               >
-                {isResendingEmail ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current mr-2"></div>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <FiRefreshCw className="mr-2" size={18} />
-                    Resend Email
-                  </>
-                )}
+                {success ? 'Continue' : 'Back to Login'}
               </button>
-            )}
-           
-            <button
-              onClick={() => setModalType('login')}
-              className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
-            >
-              {success ? 'Continue' : 'Back to Login'}
-            </button>
-          </div>
-
-          {!success && (
-            <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-              <p className="text-xs text-gray-500">
-                The verification link will expire in 24 hours for security.
-              </p>
             </div>
-          )}
+
+            {!success && (
+              <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+                <p className="text-xs text-gray-500">
+                  The verification link will expire in 24 hours for security.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
-}
- 
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
@@ -463,7 +488,7 @@ if (modalType === 'emailVerification') {
           >
             <FiX size={24} />
           </button>
- 
+
           {/* Header */}
           <div className="text-center mb-6">
             <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color">
@@ -476,21 +501,21 @@ if (modalType === 'emailVerification') {
               }
             </p>
           </div>
- 
+
           {/* Success Message */}
           {success && (
             <div className="bg-green-50 border border-green-200 text-green-600 px-4 py-3 rounded-lg mb-4 text-sm">
               {success}
             </div>
           )}
- 
+
           {/* Error Message */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg mb-4 text-sm">
               {error}
             </div>
           )}
- 
+
           {/* Login Form */}
           {modalType === 'login' && (
             <div className="space-y-4">
@@ -515,7 +540,7 @@ if (modalType === 'emailVerification') {
                   />
                 </div>
               </div>
- 
+
               {/* Password Field */}
               <div className="relative">
                 <label htmlFor="modal-password" className="block text-sm font-medium text-gray-700 mb-2">
@@ -544,7 +569,7 @@ if (modalType === 'emailVerification') {
                   </button>
                 </div>
               </div>
- 
+
               {/* Remember Me & Forgot Password */}
               <div className="flex items-center justify-between text-sm">
                 <label className="flex items-center">
@@ -558,7 +583,7 @@ if (modalType === 'emailVerification') {
                   Forgot password?
                 </a>
               </div>
- 
+
               {/* Login Button */}
               <button
                 onClick={handleLoginSubmit}
@@ -576,7 +601,7 @@ if (modalType === 'emailVerification') {
               </button>
             </div>
           )}
- 
+
           {/* Register Form */}
           {modalType === 'register' && (
             <div className="space-y-5">
@@ -603,7 +628,7 @@ if (modalType === 'emailVerification') {
                     />
                   </div>
                 </div>
- 
+
                 {/* Email Field */}
                 <div className="relative">
                   <label htmlFor="modal-email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -626,7 +651,7 @@ if (modalType === 'emailVerification') {
                   </div>
                 </div>
               </div>
- 
+
               {/* Two columns for passwords on larger screens */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Password Field */}
@@ -666,7 +691,7 @@ if (modalType === 'emailVerification') {
                     </div>
                   )}
                 </div>
- 
+
                 {/* Confirm Password Field */}
                 <div className="relative">
                   <label htmlFor="modal-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
@@ -708,7 +733,7 @@ if (modalType === 'emailVerification') {
                   )}
                 </div>
               </div>
- 
+
               {/* Terms & Conditions - Full width */}
               <div className="flex items-start space-x-3 p-4 bg-gray-50 rounded-lg">
                 <input
@@ -728,7 +753,7 @@ if (modalType === 'emailVerification') {
                   </a>
                 </label>
               </div>
- 
+
               {/* Register Button */}
               <button
                 onClick={handleRegisterSubmit}
@@ -746,7 +771,7 @@ if (modalType === 'emailVerification') {
               </button>
             </div>
           )}
- 
+
           {/* Switch between Login/Register */}
           <div className="mt-6 text-center">
             <div className="relative">
@@ -772,5 +797,5 @@ if (modalType === 'emailVerification') {
     </div>
   );
 };
- 
+
 export default AuthModal;
