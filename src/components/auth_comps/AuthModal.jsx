@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { FiUser, FiLock, FiEye, FiEyeOff, FiMail, FiX, FiRefreshCw, FiCheckCircle } from 'react-icons/fi';
+import { FiUser, FiLock, FiEye, FiEyeOff, FiMail, FiX, FiRefreshCw, FiCheckCircle, FiXCircle } from 'react-icons/fi';
 import API from '../../api';
-import { getPendingAction } from '../../utils/authUtils';
+import { getPendingAction } from '../../api';
 
 const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [modalType, setModalType] = useState(initialType);
@@ -18,6 +18,57 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [pollRetryCount, setPollRetryCount] = useState(0);
+  const maxPollRetries = 12; // 60 seconds total (12 * 5 seconds)
+
+  useEffect(() => {
+    // Check for verification parameters in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const status = urlParams.get('status');
+    const message = urlParams.get('message');
+    const data = urlParams.get('data');
+
+    if (status && message) {
+      if (status === 'success' && data) {
+        try {
+          const userData = JSON.parse(decodeURIComponent(data));
+          localStorage.setItem('token', userData.token);
+          localStorage.setItem('role', userData.role);
+          localStorage.setItem('username', userData.username);
+          localStorage.setItem('email', userData.email);
+          localStorage.setItem('isEmailVerified', 'true');
+          localStorage.setItem('justVerified', 'true');
+
+          setSuccess(decodeURIComponent(message));
+          setModalType('emailVerification');
+
+          window.dispatchEvent(new Event('usernameChanged'));
+          window.dispatchEvent(new CustomEvent('userLoggedIn'));
+
+          setTimeout(() => {
+            onClose();
+            const pendingAction = getPendingAction();
+            if (pendingAction) {
+              window.dispatchEvent(new CustomEvent('executePendingAction', {
+                detail: pendingAction
+              }));
+            }
+            window.dispatchEvent(new CustomEvent('loginSuccess', {
+              detail: { role: userData.role }
+            }));
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }, 2000);
+        } catch (err) {
+          setError('Failed to process verification data');
+          setModalType('emailVerification');
+        }
+      } else {
+        setError(decodeURIComponent(message));
+        setModalType('emailVerification');
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [onClose]);
 
   useEffect(() => {
     if (isOpen) {
@@ -30,6 +81,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setShowPassword(false);
       setShowConfirmPassword(false);
       setVerificationEmail('');
+      setPollRetryCount(0);
     }
   }, [isOpen, initialType]);
 
@@ -40,80 +92,61 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowConfirmPassword(false);
   }, [modalType]);
 
+  // Polling for verification status
   useEffect(() => {
-    const handleStorageChange = () => {
-      const isVerified = localStorage.getItem('isEmailVerified');
-      const token = localStorage.getItem('token');
-      const justVerified = localStorage.getItem('justVerified');
-      
-      if (isVerified === 'true' && token && justVerified === 'true' && modalType === 'emailVerification') {
-        localStorage.removeItem('justVerified');
-        setSuccess('Email verified successfully! You are now logged in.');
-        
-        window.dispatchEvent(new Event('usernameChanged'));
-        window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        setTimeout(() => {
-          onClose();
-          const pendingAction = getPendingAction();
-          if (pendingAction) {
-            window.dispatchEvent(new CustomEvent('executePendingAction', {
-              detail: pendingAction
-            }));
-          }
-          
-          window.dispatchEvent(new CustomEvent('loginSuccess', {
-            detail: { role: localStorage.getItem('role') }
-          }));
-        }, 1500);
-      }
-    };
+    let interval;
+    if (modalType === 'emailVerification' && verificationEmail && !success && !error) {
+      interval = setInterval(async () => {
+        if (pollRetryCount >= maxPollRetries) {
+          setError('Verification check timed out. Please try resending the verification email or refreshing the page.');
+          clearInterval(interval);
+          return;
+        }
+        try {
+          const response = await API.get(`/api/auth/verification-status/${encodeURIComponent(verificationEmail)}`);
+          if (response.data.isEmailVerified) {
+            const loginResponse = await API.post('/api/auth/login-verified', { email: verificationEmail });
+            localStorage.setItem('token', loginResponse.data.token);
+            localStorage.setItem('role', loginResponse.data.role);
+            localStorage.setItem('username', loginResponse.data.username);
+            localStorage.setItem('email', loginResponse.data.email);
+            localStorage.setItem('isEmailVerified', 'true');
+            localStorage.setItem('justVerified', 'true');
 
-    const handleMessage = (event) => {
-      if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
-        const userData = event.data.data;
-        localStorage.setItem('token', userData.token);
-        localStorage.setItem('role', userData.role);
-        localStorage.setItem('username', userData.username);
-        localStorage.setItem('email', userData.email);
-        localStorage.setItem('isEmailVerified', 'true');
-        
-        setSuccess('Email verified successfully! You are now logged in.');
-        
-        window.dispatchEvent(new Event('usernameChanged'));
-        window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        setTimeout(() => {
-          onClose();
-          const pendingAction = getPendingAction();
-          if (pendingAction) {
-            window.dispatchEvent(new CustomEvent('executePendingAction', {
-              detail: pendingAction
-            }));
+            setSuccess('Email verified successfully! You are now logged in.');
+            window.dispatchEvent(new Event('usernameChanged'));
+            window.dispatchEvent(new CustomEvent('userLoggedIn'));
+
+            setTimeout(() => {
+              onClose();
+              const pendingAction = getPendingAction();
+              if (pendingAction) {
+                window.dispatchEvent(new CustomEvent('executePendingAction', {
+                  detail: pendingAction
+                }));
+              }
+              window.dispatchEvent(new CustomEvent('loginSuccess', {
+                detail: { role: loginResponse.data.role }
+              }));
+            }, 2000);
+            clearInterval(interval);
+          } else {
+            setPollRetryCount(prev => prev + 1);
           }
-          
-          window.dispatchEvent(new CustomEvent('loginSuccess', {
-            detail: { role: userData.role }
-          }));
-        }, 1500);
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('message', handleMessage);
-    handleStorageChange();
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('message', handleMessage);
-    };
-  }, [modalType, onClose]);
+        } catch (err) {
+          console.error('Error checking verification status:', err);
+          setPollRetryCount(prev => prev + 1);
+        }
+      }, 5000); // Poll every 5 seconds
+    }
+    return () => clearInterval(interval);
+  }, [modalType, verificationEmail, onClose, pollRetryCount]);
 
   useEffect(() => {
     const handleEsc = (e) => {
       if (e.keyCode === 27) onClose();
     };
-    if (isOpen) {
+    if (isOpen || success || error) {
       document.addEventListener('keydown', handleEsc);
       document.body.style.overflow = 'hidden';
     }
@@ -121,7 +154,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       document.removeEventListener('keydown', handleEsc);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, success, error, onClose]);
 
   const handleLoginChange = (e) => {
     setLoginForm({ ...loginForm, [e.target.name]: e.target.value });
@@ -235,6 +268,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       
       if (response.data.success) {
         setSuccess(response.data.message);
+        setPollRetryCount(0); // Reset retry count on resend
       } else {
         setError(response.data.message || 'Failed to resend verification email.');
       }
@@ -249,9 +283,9 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setModalType(modalType === 'login' ? 'register' : 'login');
   };
 
-  if (!isOpen) return null;
+  if (!isOpen && !success && !error) return null;
 
-  if (modalType === 'emailVerification') {
+  if (modalType === 'emailVerification' || success || error) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <div
@@ -271,14 +305,16 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
               <div className="mb-4">
                 {success ? (
                   <FiCheckCircle className="h-16 w-16 text-green-500 mx-auto" />
+                ) : error ? (
+                  <FiXCircle className="h-16 w-16 text-red-500 mx-auto" />
                 ) : (
                   <FiMail className="h-16 w-16 text-main-color mx-auto" />
                 )}
               </div>
               <h1 className="text-2xl font-bold font-[Caveat] bg-clip-text text-transparent bg-gradient-to-tr from-main-color to-main-color mb-2">
-                {success ? 'Success!' : 'Check Your Email'}
+                {success ? 'Success!' : error ? 'Error' : 'Check Your Email'}
               </h1>
-              {!success && (
+              {!success && !error && (
                 <>
                   <p className="text-gray-600 text-sm">
                     We've sent a verification link to
@@ -303,21 +339,21 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
               </div>
             )}
 
-            {!success && (
+            {!success && !error && (
               <>
                 <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
                   <p className="font-medium mb-2">What happens next:</p>
                   <ul className="text-xs space-y-1">
                     <li>1. Check your email inbox (including spam folder)</li>
                     <li>2. Click the "Verify My Email" button in the email</li>
-                    <li>3. You will be automatically logged in here</li>
+                    <li>3. You will be automatically logged in</li>
                   </ul>
                 </div>
               </>
             )}
 
             <div className="space-y-3">
-              {!success && (
+              {!success && !error && (
                 <button
                   onClick={handleResendVerificationEmail}
                   disabled={isLoading}
@@ -337,14 +373,18 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </button>
               )}
               <button
-                onClick={() => setModalType('login')}
+                onClick={() => {
+                  setModalType('login');
+                  setSuccess('');
+                  setError('');
+                }}
                 className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
               >
                 {success ? 'Continue' : 'Back to Login'}
               </button>
             </div>
 
-            {!success && (
+            {!success && !error && (
               <div className="mt-6 pt-6 border-t border-gray-200 text-center">
                 <p className="text-xs text-gray-500">
                   The verification link will expire in 24 hours for security.
