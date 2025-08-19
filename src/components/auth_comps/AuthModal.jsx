@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FiUser, FiLock, FiEye, FiEyeOff, FiMail, FiX, FiRefreshCw, FiCheckCircle } from 'react-icons/fi';
 import API from '../../api';
 import { getPendingAction } from '../../utils/authUtils';
@@ -18,11 +18,16 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [isPolling, setIsPolling] = useState(false);
+  
+  // Ref to store polling interval
+  const pollingInterval = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
       setModalType(initialType);
     } else {
+      // Clean up when modal closes
       setLoginForm({ username: '', password: '' });
       setRegisterForm({ username: '', email: '', password: '', confirmPassword: '' });
       setError('');
@@ -30,6 +35,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       setShowPassword(false);
       setShowConfirmPassword(false);
       setVerificationEmail('');
+      stopPolling();
     }
   }, [isOpen, initialType]);
 
@@ -40,66 +46,40 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
     setShowConfirmPassword(false);
   }, [modalType]);
 
-  useEffect(() => {
-    // Listen for email verification from other tabs/devices
-    const handleBroadcastMessage = (event) => {
-      if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
-        const userData = event.data.data;
+  // Function to start polling for email verification
+  const startPolling = (email) => {
+    setIsPolling(true);
+    
+    pollingInterval.current = setInterval(async () => {
+      try {
+        const response = await API.get(`/api/auth/verification-status/${encodeURIComponent(email)}`);
         
-        // Store user data in localStorage
-        localStorage.setItem('token', userData.token);
-        localStorage.setItem('role', userData.role);
-        localStorage.setItem('username', userData.username);
-        localStorage.setItem('email', userData.email);
-        localStorage.setItem('isEmailVerified', 'true');
-        
-        setSuccess('Email verified successfully! You are now logged in.');
-        
-        // Dispatch events for UI updates
-        window.dispatchEvent(new Event('usernameChanged'));
-        window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        // Close modal and handle pending actions
-        setTimeout(() => {
-          onClose();
-          const pendingAction = getPendingAction();
-          if (pendingAction) {
-            window.dispatchEvent(new CustomEvent('executePendingAction', {
-              detail: pendingAction
-            }));
-          }
-          
-          window.dispatchEvent(new CustomEvent('loginSuccess', {
-            detail: { role: userData.role }
-          }));
-        }, 1500);
-      }
-    };
-
-    // Listen for localStorage changes (cross-tab communication fallback)
-    const handleStorageChange = (event) => {
-      if (event.key === 'emailVerificationData' && modalType === 'emailVerification') {
-        try {
-          const data = JSON.parse(event.newValue);
-          if (data && data.data && Date.now() - data.timestamp < 10000) { // Within 10 seconds
-            const userData = data.data;
+        if (response.data.isEmailVerified) {
+          // Email is verified! Auto-login the user
+          try {
+            const loginResponse = await API.post('/api/auth/login-verified', { email });
             
             // Store user data
-            localStorage.setItem('token', userData.token);
-            localStorage.setItem('role', userData.role);
-            localStorage.setItem('username', userData.username);
-            localStorage.setItem('email', userData.email);
+            localStorage.setItem('token', loginResponse.data.token);
+            localStorage.setItem('role', loginResponse.data.role);
+            localStorage.setItem('username', loginResponse.data.username);
+            localStorage.setItem('email', loginResponse.data.email);
             localStorage.setItem('isEmailVerified', 'true');
             
+            // Stop polling
+            stopPolling();
+            
+            // Show success message
             setSuccess('Email verified successfully! You are now logged in.');
             
-            // Dispatch events
+            // Dispatch events for UI updates
             window.dispatchEvent(new Event('usernameChanged'));
             window.dispatchEvent(new CustomEvent('userLoggedIn'));
             
-            // Close modal and handle pending actions
+            // Close modal and handle pending actions after a brief delay
             setTimeout(() => {
               onClose();
+              
               const pendingAction = getPendingAction();
               if (pendingAction) {
                 window.dispatchEvent(new CustomEvent('executePendingAction', {
@@ -108,38 +88,42 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
               }
               
               window.dispatchEvent(new CustomEvent('loginSuccess', {
-                detail: { role: userData.role }
+                detail: { role: loginResponse.data.role }
               }));
             }, 1500);
+            
+          } catch (loginError) {
+            console.error('Auto-login failed:', loginError);
+            setError('Email verified but auto-login failed. Please try logging in manually.');
+            stopPolling();
           }
-        } catch (error) {
-          console.error('Error parsing verification data:', error);
+        }
+      } catch (error) {
+        console.error('Polling error:', error);
+        // Continue polling unless it's a critical error
+        if (error.response?.status === 404) {
+          setError('User not found. Please try registering again.');
+          stopPolling();
         }
       }
-    };
+    }, 3000); // Poll every 3 seconds
+  };
 
-    // Set up BroadcastChannel listener
-    let channel;
-    if (typeof BroadcastChannel !== 'undefined') {
-      channel = new BroadcastChannel('email_verification');
-      channel.addEventListener('message', handleBroadcastMessage);
+  // Function to stop polling
+  const stopPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
     }
+    setIsPolling(false);
+  };
 
-    // Set up storage listener
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for postMessage events
-    window.addEventListener('message', handleBroadcastMessage);
-
+  // Clean up polling on component unmount
+  useEffect(() => {
     return () => {
-      if (channel) {
-        channel.removeEventListener('message', handleBroadcastMessage);
-        channel.close();
-      }
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('message', handleBroadcastMessage);
+      stopPolling();
     };
-  }, [modalType, onClose]);
+  }, []);
 
   useEffect(() => {
     const handleEsc = (e) => {
@@ -216,6 +200,8 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
         setError('Please verify your email before logging in.');
         setVerificationEmail(err.response.data.email);
         setModalType('emailVerification');
+        // Start polling for this email
+        startPolling(err.response.data.email);
       } else {
         setError(err.response?.data?.message || 'Invalid credentials. Please try again.');
       }
@@ -246,6 +232,8 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
         setTimeout(() => {
           setModalType('emailVerification');
           setSuccess('');
+          // Start polling for verification
+          startPolling(registerForm.email);
         }, 1500);
       }
     } catch (err) {
@@ -267,6 +255,10 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       
       if (response.data.success) {
         setSuccess(response.data.message);
+        // Restart polling after resending
+        if (!isPolling) {
+          startPolling(verificationEmail);
+        }
       } else {
         setError(response.data.message || 'Failed to resend verification email.');
       }
@@ -278,6 +270,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   };
 
   const switchModalType = () => {
+    stopPolling(); // Stop polling when switching modal types
     setModalType(modalType === 'login' ? 'register' : 'login');
   };
 
@@ -337,6 +330,14 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
 
             {!success && (
               <>
+                {/* Polling Status Indicator */}
+                {isPolling && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-4 text-sm flex items-center">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
+                    <span>Waiting for email verification... We'll automatically log you in once verified!</span>
+                  </div>
+                )}
+
                 <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-lg mb-6 text-sm">
                   <p className="font-medium mb-2">What happens next:</p>
                   <ul className="text-xs space-y-1">
@@ -348,7 +349,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 
                 <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg mb-6 text-sm">
                   <p className="font-medium mb-1">Cross-Device Support:</p>
-                  <p className="text-xs">You can click the verification link on any device. Once verified, you'll be automatically logged in on this device.</p>
+                  <p className="text-xs">You can click the verification link on any device (mobile, tablet, etc.). Once verified, you'll be automatically logged in on this device!</p>
                 </div>
               </>
             )}
@@ -374,7 +375,10 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                 </button>
               )}
               <button
-                onClick={() => setModalType('login')}
+                onClick={() => {
+                  stopPolling();
+                  setModalType('login');
+                }}
                 className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
               >
                 {success ? 'Continue' : 'Back to Login'}
