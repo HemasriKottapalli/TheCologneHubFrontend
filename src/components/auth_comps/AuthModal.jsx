@@ -41,9 +41,12 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   }, [modalType]);
 
   useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data?.type === 'EMAIL_VERIFIED') {
+    // Listen for email verification from other tabs/devices
+    const handleBroadcastMessage = (event) => {
+      if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
         const userData = event.data.data;
+        
+        // Store user data in localStorage
         localStorage.setItem('token', userData.token);
         localStorage.setItem('role', userData.role);
         localStorage.setItem('username', userData.username);
@@ -52,9 +55,11 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
         
         setSuccess('Email verified successfully! You are now logged in.');
         
+        // Dispatch events for UI updates
         window.dispatchEvent(new Event('usernameChanged'));
         window.dispatchEvent(new CustomEvent('userLoggedIn'));
         
+        // Close modal and handle pending actions
         setTimeout(() => {
           onClose();
           const pendingAction = getPendingAction();
@@ -67,20 +72,74 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
           window.dispatchEvent(new CustomEvent('loginSuccess', {
             detail: { role: userData.role }
           }));
-          
-          if (userData.role === 'admin') {
-            window.location.href = '/admin';
-          }
         }, 1500);
       }
     };
-    
-    window.addEventListener('message', handleMessage);
-    
-    return () => {
-      window.removeEventListener('message', handleMessage);
+
+    // Listen for localStorage changes (cross-tab communication fallback)
+    const handleStorageChange = (event) => {
+      if (event.key === 'emailVerificationData' && modalType === 'emailVerification') {
+        try {
+          const data = JSON.parse(event.newValue);
+          if (data && data.data && Date.now() - data.timestamp < 10000) { // Within 10 seconds
+            const userData = data.data;
+            
+            // Store user data
+            localStorage.setItem('token', userData.token);
+            localStorage.setItem('role', userData.role);
+            localStorage.setItem('username', userData.username);
+            localStorage.setItem('email', userData.email);
+            localStorage.setItem('isEmailVerified', 'true');
+            
+            setSuccess('Email verified successfully! You are now logged in.');
+            
+            // Dispatch events
+            window.dispatchEvent(new Event('usernameChanged'));
+            window.dispatchEvent(new CustomEvent('userLoggedIn'));
+            
+            // Close modal and handle pending actions
+            setTimeout(() => {
+              onClose();
+              const pendingAction = getPendingAction();
+              if (pendingAction) {
+                window.dispatchEvent(new CustomEvent('executePendingAction', {
+                  detail: pendingAction
+                }));
+              }
+              
+              window.dispatchEvent(new CustomEvent('loginSuccess', {
+                detail: { role: userData.role }
+              }));
+            }, 1500);
+          }
+        } catch (error) {
+          console.error('Error parsing verification data:', error);
+        }
+      }
     };
-  }, [onClose]);
+
+    // Set up BroadcastChannel listener
+    let channel;
+    if (typeof BroadcastChannel !== 'undefined') {
+      channel = new BroadcastChannel('email_verification');
+      channel.addEventListener('message', handleBroadcastMessage);
+    }
+
+    // Set up storage listener
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for postMessage events
+    window.addEventListener('message', handleBroadcastMessage);
+
+    return () => {
+      if (channel) {
+        channel.removeEventListener('message', handleBroadcastMessage);
+        channel.close();
+      }
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('message', handleBroadcastMessage);
+    };
+  }, [modalType, onClose]);
 
   useEffect(() => {
     const handleEsc = (e) => {
@@ -184,7 +243,10 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       
       if (response.data.success) {
         setSuccess(response.data.message);
-        setModalType('emailVerification');
+        setTimeout(() => {
+          setModalType('emailVerification');
+          setSuccess('');
+        }, 1500);
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -283,6 +345,16 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                     <li>3. You will be automatically logged in here</li>
                   </ul>
                 </div>
+                
+                <div className="bg-amber-50 border border-amber-200 text-amber-700 px-4 py-3 rounded-lg mb-6 text-sm">
+                  <p className="font-medium mb-1">Cross-Device Support:</p>
+                  <p className="text-xs">You can click the verification link on any device. Once verified, you'll be automatically logged in on this device.</p>
+                </div>
+              </>
+            )}
+
+            <div className="space-y-3">
+              {!success && (
                 <button
                   onClick={handleResendVerificationEmail}
                   disabled={isLoading}
@@ -300,7 +372,21 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                     </>
                   )}
                 </button>
-              </>
+              )}
+              <button
+                onClick={() => setModalType('login')}
+                className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
+              >
+                {success ? 'Continue' : 'Back to Login'}
+              </button>
+            </div>
+
+            {!success && (
+              <div className="mt-6 pt-6 border-t border-gray-200 text-center">
+                <p className="text-xs text-gray-500">
+                  The verification link will expire in 24 hours for security.
+                </p>
+              </div>
             )}
           </div>
         </div>
