@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FiCheckCircle, FiXCircle, FiRefreshCw, FiArrowLeft, FiClock } from 'react-icons/fi';
-
+ 
 const EmailVerificationPage = () => {
   const [status, setStatus] = useState('verifying');
   const [message, setMessage] = useState('');

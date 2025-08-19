@@ -41,36 +41,8 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
   }, [modalType]);
 
   useEffect(() => {
-    const handleStorageChange = () => {
-      const isVerified = localStorage.getItem('isEmailVerified');
-      const token = localStorage.getItem('token');
-      const justVerified = localStorage.getItem('justVerified');
-      
-      if (isVerified === 'true' && token && justVerified === 'true' && modalType === 'emailVerification') {
-        localStorage.removeItem('justVerified');
-        setSuccess('Email verified successfully! You are now logged in.');
-        
-        window.dispatchEvent(new Event('usernameChanged'));
-        window.dispatchEvent(new CustomEvent('userLoggedIn'));
-        
-        setTimeout(() => {
-          onClose();
-          const pendingAction = getPendingAction();
-          if (pendingAction) {
-            window.dispatchEvent(new CustomEvent('executePendingAction', {
-              detail: pendingAction
-            }));
-          }
-          
-          window.dispatchEvent(new CustomEvent('loginSuccess', {
-            detail: { role: localStorage.getItem('role') }
-          }));
-        }, 1500);
-      }
-    };
-
     const handleMessage = (event) => {
-      if (event.data?.type === 'EMAIL_VERIFIED' && modalType === 'emailVerification') {
+      if (event.data?.type === 'EMAIL_VERIFIED') {
         const userData = event.data.data;
         localStorage.setItem('token', userData.token);
         localStorage.setItem('role', userData.role);
@@ -95,19 +67,20 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
           window.dispatchEvent(new CustomEvent('loginSuccess', {
             detail: { role: userData.role }
           }));
+          
+          if (userData.role === 'admin') {
+            window.location.href = '/admin';
+          }
         }, 1500);
       }
     };
     
-    window.addEventListener('storage', handleStorageChange);
     window.addEventListener('message', handleMessage);
-    handleStorageChange();
     
     return () => {
-      window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('message', handleMessage);
     };
-  }, [modalType, onClose]);
+  }, [onClose]);
 
   useEffect(() => {
     const handleEsc = (e) => {
@@ -211,10 +184,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
       
       if (response.data.success) {
         setSuccess(response.data.message);
-        setTimeout(() => {
-          setModalType('emailVerification');
-          setSuccess('');
-        }, 1500);
+        setModalType('emailVerification');
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Please try again.');
@@ -313,11 +283,6 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                     <li>3. You will be automatically logged in here</li>
                   </ul>
                 </div>
-              </>
-            )}
-
-            <div className="space-y-3">
-              {!success && (
                 <button
                   onClick={handleResendVerificationEmail}
                   disabled={isLoading}
@@ -335,21 +300,7 @@ const AuthModal = ({ isOpen, onClose, initialType = 'login' }) => {
                     </>
                   )}
                 </button>
-              )}
-              <button
-                onClick={() => setModalType('login')}
-                className="w-full bg-main-color text-white py-3 px-4 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
-              >
-                {success ? 'Continue' : 'Back to Login'}
-              </button>
-            </div>
-
-            {!success && (
-              <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-                <p className="text-xs text-gray-500">
-                  The verification link will expire in 24 hours for security.
-                </p>
-              </div>
+              </>
             )}
           </div>
         </div>
