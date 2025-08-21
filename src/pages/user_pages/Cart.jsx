@@ -1,8 +1,15 @@
+// pages/Cart.jsx - Updated version with proper Stripe integration
 import { useState, useEffect } from 'react';
+import { loadStripe } from '@stripe/stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 import API from '../../api';
 import OrderSummary from '../../components/user_comps/OrderSummary';
 import CartItems from '../../components/user_comps/CartItems';
+import CheckoutForm from '../../components/user_comps/CheckoutForm';
+import ShippingForm from '../../components/user_comps/ShippingForm';
 
+// Load Stripe with your publishable key
+const stripePromise = loadStripe(import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
 
 function Cart() {
   const [cartItems, setCartItems] = useState([]);
@@ -12,6 +19,12 @@ function Cart() {
   const [appliedPromo, setAppliedPromo] = useState(null);
   const [updatingItems, setUpdatingItems] = useState(new Set());
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  
+  // Checkout flow states
+  const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart', 'shipping', 'payment'
+  const [shippingAddress, setShippingAddress] = useState(null);
+  const [clientSecret, setClientSecret] = useState('');
+  const [orderId, setOrderId] = useState('');
 
   // Fetch cart items on component mount
   useEffect(() => {
@@ -142,48 +155,89 @@ function Cart() {
     setError(null);
   };
 
-  const handleCheckout = async () => {
+  // Start checkout process
+  const handleCheckout = () => {
+    if (inStockItems.length === 0) {
+      setError('No items available for checkout');
+      return;
+    }
+    setCheckoutStep('shipping');
+  };
+
+  // Handle shipping form submission
+  const handleShippingSubmit = async (shippingData) => {
     try {
       setCheckoutLoading(true);
       setError(null);
-      
-      // Prepare checkout data
+      setShippingAddress(shippingData);
+
+      // Create payment intent
       const checkoutData = {
         items: inStockItems.map(item => ({
           productId: item.productId,
+          name: item.name,
           quantity: item.quantity,
           price: item.price
         })),
         promoCode: appliedPromo?.code || null,
         subtotal: subtotal,
-        discount: promoDiscount,
+        promoDiscount: promoDiscount,
         shipping: shipping,
         tax: tax,
-        total: total
+        total: total,
+        shippingAddress: shippingData
       };
 
-      // Call checkout API
-      const response = await API.post('/api/customer/checkout', checkoutData);
+      const response = await API.post('/api/customer/create-payment-intent', checkoutData);
       
       if (response.data.success) {
-        // Redirect to payment or success page
-        const { orderId, paymentUrl } = response.data;
-        
-        if (paymentUrl) {
-          // Redirect to payment gateway
-          window.location.href = paymentUrl;
-        } else {
-          // Redirect to order confirmation
-          window.location.href = `/order-confirmation/${orderId}`;
-        }
+        setClientSecret(response.data.clientSecret);
+        setOrderId(response.data.orderId);
+        setCheckoutStep('payment');
+      } else {
+        setError('Failed to initialize payment');
       }
       
     } catch (err) {
-      console.error('Checkout error:', err);
-      const errorMessage = err.response?.data?.message || 'Checkout failed. Please try again.';
+      console.error('Payment initialization error:', err);
+      const errorMessage = err.response?.data?.message || 'Failed to initialize payment. Please try again.';
       setError(errorMessage);
     } finally {
       setCheckoutLoading(false);
+    }
+  };
+
+  // Handle successful payment
+  const handlePaymentSuccess = async (completedOrderId) => {
+    try {
+      // Confirm payment on backend
+      await API.post('/api/customer/confirm-payment', {
+        paymentIntentId: clientSecret.split('_secret_')[0],
+        orderId: completedOrderId
+      });
+
+      // Redirect to order confirmation
+      window.location.href = `/order-confirmation/${completedOrderId}`;
+      
+    } catch (err) {
+      console.error('Payment confirmation error:', err);
+      setError('Payment succeeded but confirmation failed. Please contact support.');
+    }
+  };
+
+  // Handle payment error
+  const handlePaymentError = (errorMessage) => {
+    setError(errorMessage);
+  };
+
+  // Back to previous step
+  const handleBack = () => {
+    if (checkoutStep === 'payment') {
+      setCheckoutStep('shipping');
+      setClientSecret('');
+      setOrderId('');
+    } else if (checkoutStep === 'shipping') {
+      setCheckoutStep('cart');
     }
   };
 
@@ -196,8 +250,8 @@ function Cart() {
   // Calculate totals
   const subtotal = inStockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const promoDiscount = appliedPromo ? (subtotal * appliedPromo.discount) / 100 : 0;
-  const shipping = subtotal > 100 ? 0 : 9.99;
-  const tax = (subtotal - promoDiscount) * 0.08;
+  const shipping = subtotal > 1000 ? 0 : 50; // Free shipping over ₹1000, otherwise ₹50
+  const tax = (subtotal - promoDiscount) * 0.18; // 18% GST for India
   const total = subtotal - promoDiscount + shipping + tax;
 
   // Loading state
@@ -213,7 +267,7 @@ function Cart() {
   }
 
   // Empty cart state
-  if (cartItems.length === 0 && !loading) {
+  if (cartItems.length === 0 && !loading && checkoutStep === 'cart') {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="text-center py-16">
@@ -231,36 +285,99 @@ function Cart() {
     );
   }
 
+  // Render based on checkout step
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <CartItems
-          inStockItems={inStockItems}
-          outOfStockItems={outOfStockItems}
-          updatingItems={updatingItems}
-          updateQuantity={updateQuantity}
-          removeItem={removeItem}
-          error={error}
-          clearError={clearError}
-        />
-        
-        <OrderSummary
-          inStockItems={inStockItems}
-          outOfStockItems={outOfStockItems}
-          promoCode={promoCode}
-          setPromoCode={setPromoCode}
-          appliedPromo={appliedPromo}
-          applyPromoCode={applyPromoCode}
-          removePromo={removePromo}
-          subtotal={subtotal}
-          promoDiscount={promoDiscount}
-          shipping={shipping}
-          tax={tax}
-          total={total}
-          onCheckout={handleCheckout}
-          checkoutLoading={checkoutLoading}
-        />
+      {/* Progress indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-center space-x-4">
+          <div className={`flex items-center ${checkoutStep === 'cart' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              checkoutStep === 'cart' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+            }`}>1</div>
+            <span className="ml-2 font-medium">Cart</span>
+          </div>
+          <div className="w-12 h-px bg-gray-300"></div>
+          <div className={`flex items-center ${checkoutStep === 'shipping' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              checkoutStep === 'shipping' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+            }`}>2</div>
+            <span className="ml-2 font-medium">Shipping</span>
+          </div>
+          <div className="w-12 h-px bg-gray-300"></div>
+          <div className={`flex items-center ${checkoutStep === 'payment' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+              checkoutStep === 'payment' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+            }`}>3</div>
+            <span className="ml-2 font-medium">Payment</span>
+          </div>
+        </div>
       </div>
+
+      {/* Error display */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md flex justify-between items-center">
+          <span>{error}</span>
+          <button onClick={clearError} className="text-red-500 hover:text-red-700">×</button>
+        </div>
+      )}
+
+      {/* Render appropriate step */}
+      {checkoutStep === 'cart' && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <CartItems
+            inStockItems={inStockItems}
+            outOfStockItems={outOfStockItems}
+            updatingItems={updatingItems}
+            updateQuantity={updateQuantity}
+            removeItem={removeItem}
+            error={error}
+            clearError={clearError}
+          />
+          
+          <OrderSummary
+            inStockItems={inStockItems}
+            outOfStockItems={outOfStockItems}
+            promoCode={promoCode}
+            setPromoCode={setPromoCode}
+            appliedPromo={appliedPromo}
+            applyPromoCode={applyPromoCode}
+            removePromo={removePromo}
+            subtotal={subtotal}
+            promoDiscount={promoDiscount}
+            shipping={shipping}
+            tax={tax}
+            total={total}
+            onCheckout={handleCheckout}
+            checkoutLoading={checkoutLoading}
+          />
+        </div>
+      )}
+
+      {checkoutStep === 'shipping' && (
+        <div className="max-w-2xl mx-auto">
+          <ShippingForm
+            onSubmit={handleShippingSubmit}
+            onBack={handleBack}
+            loading={checkoutLoading}
+          />
+        </div>
+      )}
+
+      {checkoutStep === 'payment' && clientSecret && (
+        <div className="max-w-2xl mx-auto">
+          <Elements stripe={stripePromise} options={{ clientSecret }}>
+            <CheckoutForm
+              clientSecret={clientSecret}
+              orderId={orderId}
+              onPaymentSuccess={handlePaymentSuccess}
+              onPaymentError={handlePaymentError}
+              orderTotal={total}
+              onBack={handleBack}
+            />
+          </Elements>
+        </div>
+      )}
     </div>
   );
 }
