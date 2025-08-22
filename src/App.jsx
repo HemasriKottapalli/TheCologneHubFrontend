@@ -18,6 +18,7 @@ import ScrollToTop from './components/common_comps/ScrolllToTop';
 import ProtectedRoute from './components/common_comps/ProtectedRoute'; // Adjust path as needed
 import ManageBrands from './pages/admin_pages/ManageBrands';
 import ManageInventory from './pages/admin_pages/ManageInvenTory';
+import OrderConfirmation from './pages/user_pages/OrderConfirmationPage';
 
 function App() {
   return (
@@ -43,6 +44,8 @@ function App() {
           <Route path="/cart" element={<Cart />} />
           <Route path="/wishlist" element={<Wishlist />} />
         </Route>
+
+        <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
 
         {/* Admin Routes - Admin Only */}
         <Route 

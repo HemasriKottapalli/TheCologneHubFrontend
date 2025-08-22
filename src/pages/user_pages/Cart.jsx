@@ -1,6 +1,8 @@
+// Fixed Cart.jsx with better error handling and debugging
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
+import { useNavigate } from 'react-router-dom'; // Add this import
 import API from '../../api';
 import OrderSummary from '../../components/user_comps/OrderSummary';
 import CartItems from '../../components/user_comps/CartItems';
@@ -11,6 +13,7 @@ import ShippingForm from '../../components/user_comps/ShippingForm';
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function Cart() {
+  const navigate = useNavigate(); // Add navigation hook
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -20,18 +23,22 @@ function Cart() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   
   // Checkout flow states
-  const [checkoutStep, setCheckoutStep] = useState('cart'); // 'cart', 'shipping', 'payment'
+  const [checkoutStep, setCheckoutStep] = useState('cart');
   const [shippingAddress, setShippingAddress] = useState(null);
   const [clientSecret, setClientSecret] = useState('');
   const [orderId, setOrderId] = useState('');
 
   // Debug: Check if Stripe key is loaded
   useEffect(() => {
-    console.log('Stripe publishable key:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'Found' : 'Missing');
+    console.log('🔧 Cart Component Debug Info:');
+    console.log('- Stripe key:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'Found ✅' : 'Missing ❌');
+    console.log('- Current step:', checkoutStep);
+    console.log('- Cart items:', cartItems.length);
+    
     if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
       setError('Stripe configuration is missing. Please check environment variables.');
     }
-  }, []);
+  }, [checkoutStep, cartItems.length]);
 
   // Fetch cart items on component mount
   useEffect(() => {
@@ -45,7 +52,6 @@ function Cart() {
       
       const response = await API.get('/api/customer/cart');
       
-      // Transform API response to match component structure
       const transformedItems = (response.data.items || [])
         .filter(item => {
           return item.product && 
@@ -71,7 +77,7 @@ function Cart() {
       
       setCartItems(transformedItems);
     } catch (err) {
-      console.error('Error fetching cart:', err);
+      console.error('❌ Error fetching cart:', err);
       const errorMessage = err.response?.data?.message || err.message || 'Failed to load cart items. Please try again.';
       setError(errorMessage);
     } finally {
@@ -162,14 +168,12 @@ function Cart() {
     setError(null);
   };
 
-  // Start checkout process
   const handleCheckout = () => {
     if (inStockItems.length === 0) {
       setError('No items available for checkout');
       return;
     }
     
-    // Check if Stripe is properly configured
     if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
       setError('Payment system is not configured. Please contact support.');
       return;
@@ -178,14 +182,12 @@ function Cart() {
     setCheckoutStep('shipping');
   };
 
-  // Handle shipping form submission
   const handleShippingSubmit = async (shippingData) => {
     try {
       setCheckoutLoading(true);
       setError(null);
       setShippingAddress(shippingData);
 
-      // Create payment intent
       const checkoutData = {
         items: inStockItems.map(item => ({
           productId: item.productId,
@@ -202,7 +204,7 @@ function Cart() {
         shippingAddress: shippingData
       };
 
-      console.log('Creating payment intent with data:', checkoutData);
+      console.log('💳 Creating payment intent with data:', checkoutData);
 
       const response = await API.post('/api/customer/create-payment-intent', checkoutData);
       
@@ -210,45 +212,75 @@ function Cart() {
         setClientSecret(response.data.clientSecret);
         setOrderId(response.data.orderId);
         setCheckoutStep('payment');
-        console.log('Payment intent created successfully');
+        console.log('✅ Payment intent created successfully');
       } else {
-        setError(response.data.message || 'Failed to initialize payment');
+        throw new Error(response.data.message || 'Failed to initialize payment');
       }
       
     } catch (err) {
-      console.error('Payment initialization error:', err);
-      const errorMessage = err.response?.data?.message || 'Failed to initialize payment. Please try again.';
+      console.error('❌ Payment initialization error:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to initialize payment. Please try again.';
       setError(errorMessage);
     } finally {
       setCheckoutLoading(false);
     }
   };
 
-  // Handle successful payment
+  // Fixed payment success handler with better error handling
   const handlePaymentSuccess = async (completedOrderId) => {
     try {
+      console.log('🎉 Payment successful! Order ID:', completedOrderId);
+      console.log('🔄 Confirming payment with backend...');
+      
       // Confirm payment on backend
-      await API.post('/api/customer/confirm-payment', {
+      const confirmResponse = await API.post('/api/customer/confirm-payment', {
         paymentIntentId: clientSecret.split('_secret_')[0],
         orderId: completedOrderId
       });
 
-      // Redirect to order confirmation
-      window.location.href = `/order-confirmation/${completedOrderId}`;
+      console.log('✅ Payment confirmed:', confirmResponse.data);
+
+      // Check if confirmation was successful
+      if (confirmResponse.data.success) {
+        console.log('🚀 Redirecting to order confirmation...');
+        
+        // Use React Router navigation instead of window.location
+        navigate(`/order-confirmation/${completedOrderId}`, { 
+          replace: true,
+          state: { 
+            orderConfirmed: true,
+            orderData: confirmResponse.data.order 
+          }
+        });
+      } else {
+        throw new Error('Payment confirmation failed');
+      }
       
     } catch (err) {
-      console.error('Payment confirmation error:', err);
-      setError('Payment succeeded but confirmation failed. Please contact support.');
+      console.error('❌ Payment confirmation error:', err);
+      
+      // More specific error handling
+      if (err.response?.status === 404) {
+        setError('Order not found. Payment may have succeeded but order confirmation failed. Please contact support with your payment details.');
+      } else if (err.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        // Redirect to login or refresh page
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setError('Payment succeeded but confirmation failed. Please contact support or check your order history.');
+      }
     }
   };
 
-  // Handle payment error
+  // Enhanced payment error handler
   const handlePaymentError = (errorMessage) => {
-    setError(errorMessage);
-    console.error('Payment error:', errorMessage);
+    console.error('❌ Payment failed:', errorMessage);
+    setError(`Payment failed: ${errorMessage}`);
+    
+    // Don't redirect on payment failure - stay on payment page
+    // User can try again
   };
 
-  // Back to previous step
   const handleBack = () => {
     if (checkoutStep === 'payment') {
       setCheckoutStep('shipping');
@@ -261,15 +293,13 @@ function Cart() {
 
   const clearError = () => setError(null);
 
-  // Separate items by stock status
+  // Calculate values
   const inStockItems = cartItems.filter(item => item.stockQuantity > 0);
   const outOfStockItems = cartItems.filter(item => item.stockQuantity <= 0);
-
-  // Calculate totals
   const subtotal = inStockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const promoDiscount = appliedPromo ? (subtotal * appliedPromo.discount) / 100 : 0;
-  const shipping = subtotal > 1000 ? 0 : 50; // Free shipping over ₹1000, otherwise ₹50
-  const tax = (subtotal - promoDiscount) * 0.18; // 18% GST for India
+  const shipping = subtotal > 1000 ? 0 : 50;
+  const tax = (subtotal - promoDiscount) * 0.18;
   const total = subtotal - promoDiscount + shipping + tax;
 
   // Loading state
@@ -293,7 +323,7 @@ function Cart() {
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h3>
           <p className="text-gray-600 mb-4">Add some amazing fragrances to get started</p>
           <button 
-            onClick={() => window.location.href = '/products'}
+            onClick={() => navigate('/products')}
             className="px-6 py-3 bg-[#8B5A7C] text-white rounded-lg hover:bg-[#8B5A7C]/90 transition-colors"
           >
             Continue Shopping
@@ -303,10 +333,9 @@ function Cart() {
     );
   }
 
-  // Render based on checkout step
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Progress indicator - Always show when not empty cart */}
+      {/* Progress indicator */}
       {cartItems.length > 0 && (
         <div className="mb-8">
           <div className="flex items-center justify-center space-x-4">
@@ -339,6 +368,13 @@ function Cart() {
         <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md flex justify-between items-center">
           <span>{error}</span>
           <button onClick={clearError} className="text-red-500 hover:text-red-700">×</button>
+        </div>
+      )}
+
+      {/* Debug info - remove this in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
+          <strong>Debug:</strong> Step = {checkoutStep}, Items = {cartItems.length}, Order ID = {orderId || 'none'}
         </div>
       )}
 
@@ -394,6 +430,7 @@ function Cart() {
               onPaymentError={handlePaymentError}
               orderTotal={total}
               onBack={handleBack}
+              shippingAddress={shippingAddress}
             />
           </Elements>
         </div>

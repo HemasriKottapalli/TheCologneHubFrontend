@@ -1,4 +1,4 @@
-// components/user_comps/CheckoutForm.jsx
+// components/user_comps/CheckoutForm.jsx - Fixed version
 import React, { useState, useEffect } from 'react';
 import {
   useStripe,
@@ -13,7 +13,8 @@ function CheckoutForm({
   onPaymentSuccess,
   onPaymentError,
   orderTotal,
-  onBack
+  onBack,
+  shippingAddress // Add shipping address prop
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -46,22 +47,55 @@ function CheckoutForm({
     setPaymentError(null);
 
     try {
-      // Confirm the payment
+      // Prepare billing details from shipping address
+      const billingDetails = shippingAddress ? {
+        name: shippingAddress.fullName,
+        email: shippingAddress.email,
+        phone: shippingAddress.phone,
+        address: {
+          line1: shippingAddress.address,
+          city: shippingAddress.city,
+          state: shippingAddress.state,
+          postal_code: shippingAddress.zipCode,
+          country: shippingAddress.country === 'India' ? 'IN' : shippingAddress.country
+        }
+      } : {
+        name: 'Customer',
+        address: {
+          country: 'IN'
+        }
+      };
+
+      // Confirm the payment with billing details
       const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         redirect: 'if_required',
         confirmParams: {
           return_url: `${window.location.origin}/order-confirmation/${orderId}`,
+          payment_method_data: {
+            billing_details: billingDetails
+          }
         },
       });
 
       if (error) {
         console.error('Payment confirmation error:', error);
-        setPaymentError(error.message || 'Payment failed. Please try again.');
+        
+        // Handle specific error types
+        if (error.type === 'card_error') {
+          setPaymentError(`Card Error: ${error.message}`);
+        } else if (error.type === 'validation_error') {
+          setPaymentError(`Validation Error: ${error.message}`);
+        } else {
+          setPaymentError(error.message || 'Payment failed. Please try again.');
+        }
+        
         onPaymentError(error.message || 'Payment failed');
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
         console.log('Payment succeeded:', paymentIntent.id);
         onPaymentSuccess(orderId);
+      } else if (paymentIntent && paymentIntent.status === 'processing') {
+        setPaymentError('Payment is being processed. Please wait...');
       } else {
         setPaymentError('Payment status unclear. Please check your order history.');
       }
@@ -74,6 +108,7 @@ function CheckoutForm({
     }
   };
 
+  // Fixed payment element options
   const paymentElementOptions = {
     layout: 'tabs',
     paymentMethodOrder: ['card'],
@@ -82,14 +117,7 @@ function CheckoutForm({
         name: 'auto',
         email: 'auto',
         phone: 'auto',
-        address: {
-          country: 'never',
-          line1: 'never',
-          line2: 'never',
-          city: 'never',
-          state: 'never',
-          postal_code: 'never'
-        }
+        address: 'never' // We'll provide this in confirmPayment
       }
     },
     terms: {
@@ -107,20 +135,48 @@ function CheckoutForm({
         <p className="text-gray-600">Order Total: ₹{orderTotal.toFixed(2)}</p>
       </div>
 
+      {/* Show billing address info */}
+      {shippingAddress && (
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-sm font-medium text-gray-900 mb-2">Billing Address (Same as Shipping)</h3>
+          <div className="text-sm text-gray-600">
+            <p>{shippingAddress.fullName}</p>
+            <p>{shippingAddress.address}</p>
+            <p>{shippingAddress.city}, {shippingAddress.state} {shippingAddress.zipCode}</p>
+            <p>{shippingAddress.country}</p>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Payment Element */}
         <div className="p-4 border border-gray-200 rounded-lg">
           <PaymentElement 
             options={paymentElementOptions}
-            onReady={() => setPaymentElementReady(true)}
+            onReady={() => {
+              setPaymentElementReady(true);
+              console.log('Payment Element ready');
+            }}
             onChange={(event) => {
               if (event.error) {
                 setPaymentError(event.error.message);
+                console.error('Payment Element error:', event.error);
               } else {
                 setPaymentError(null);
               }
+              
+              if (event.complete) {
+                console.log('Payment Element complete');
+              }
             }}
           />
+        </div>
+
+        {/* Test Card Info */}
+        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Test Card:</strong> 4242 4242 4242 4242 | Any future expiry | Any 3-digit CVC
+          </p>
         </div>
 
         {/* Security Notice */}
