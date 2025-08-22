@@ -162,8 +162,8 @@ function FilterSidebar({
           {accordionStates.price && (
             <div className="space-y-4 pl-2">
               <div className="flex items-center justify-between text-sm text-gray-600">
-                <span>₹{filters.priceRange[0]}</span>
-                <span>₹{filters.priceRange[1]}</span>
+                <span>${filters.priceRange[0]}</span>
+                <span>${filters.priceRange[1]}</span>
               </div>
               
               <div className="space-y-2">

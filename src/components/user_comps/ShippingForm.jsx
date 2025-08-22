@@ -11,7 +11,7 @@ function ShippingForm({ onSubmit, onBack, loading }) {
     city: '',
     state: '',
     zipCode: '',
-    country: 'India'
+    country: 'United States'
   });
 
   const [errors, setErrors] = useState({});
@@ -32,22 +32,28 @@ function ShippingForm({ onSubmit, onBack, loading }) {
     }
   };
 
-  const validateForm = () => {
+const validateForm = () => {
     const newErrors = {};
 
     if (!formData.fullName.trim()) newErrors.fullName = 'Full name is required';
     if (!formData.email.trim()) newErrors.email = 'Email is required';
     else if (!/\S+@\S+\.\S+/.test(formData.email)) newErrors.email = 'Email is invalid';
     if (!formData.phone.trim()) newErrors.phone = 'Phone number is required';
-    else if (!/^\+?[\d\s-()]{10,}$/.test(formData.phone)) newErrors.phone = 'Phone number is invalid';
+    else if (!/^\+?1?[-.\s]?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}$/.test(formData.phone.replace(/\s/g, ''))) {
+      newErrors.phone = 'Phone number is invalid (use format: +1 555 123 4567)';
+    }
     if (!formData.address.trim()) newErrors.address = 'Address is required';
     if (!formData.city.trim()) newErrors.city = 'City is required';
     if (!formData.state.trim()) newErrors.state = 'State is required';
     if (!formData.zipCode.trim()) newErrors.zipCode = 'ZIP code is required';
+    else if (!/^\d{5}(-\d{4})?$/.test(formData.zipCode)) {
+      newErrors.zipCode = 'ZIP code must be in format 12345 or 12345-6789';
+    }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -56,13 +62,17 @@ function ShippingForm({ onSubmit, onBack, loading }) {
     }
   };
 
-  const indianStates = [
-    'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 
-    'Delhi', 'Goa', 'Gujarat', 'Haryana', 'Himachal Pradesh', 'Jharkhand', 
-    'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra', 'Manipur', 
-    'Meghalaya', 'Mizoram', 'Nagaland', 'Odisha', 'Punjab', 'Rajasthan', 
-    'Sikkim', 'Tamil Nadu', 'Telangana', 'Tripura', 'Uttar Pradesh', 
-    'Uttarakhand', 'West Bengal'
+  const usStates = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado',
+    'Connecticut', 'Delaware', 'Florida', 'Georgia', 'Hawaii', 'Idaho',
+    'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky', 'Louisiana',
+    'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota',
+    'Mississippi', 'Missouri', 'Montana', 'Nebraska', 'Nevada',
+    'New Hampshire', 'New Jersey', 'New Mexico', 'New York',
+    'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon',
+    'Pennsylvania', 'Rhode Island', 'South Carolina', 'South Dakota',
+    'Tennessee', 'Texas', 'Utah', 'Vermont', 'Virginia', 'Washington',
+    'West Virginia', 'Wisconsin', 'Wyoming'
   ];
 
   return (
@@ -128,7 +138,7 @@ function ShippingForm({ onSubmit, onBack, loading }) {
             className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#8B5A7C] focus:border-transparent ${
               errors.phone ? 'border-red-300' : 'border-gray-300'
             }`}
-            placeholder="+91 XXXXX XXXXX"
+            placeholder="+1 (555) 123-4567"
           />
           {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
         </div>
@@ -179,7 +189,7 @@ function ShippingForm({ onSubmit, onBack, loading }) {
               }`}
             >
               <option value="">Select State</option>
-              {indianStates.map(state => (
+              {usStates.map(state => (
                 <option key={state} value={state}>{state}</option>
               ))}
             </select>
@@ -198,7 +208,7 @@ function ShippingForm({ onSubmit, onBack, loading }) {
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-[#8B5A7C] focus:border-transparent ${
                 errors.zipCode ? 'border-red-300' : 'border-gray-300'
               }`}
-              placeholder="Enter PIN code"
+              placeholder="Enter ZIP code"
               maxLength={6}
             />
             {errors.zipCode && <p className="mt-1 text-sm text-red-600">{errors.zipCode}</p>}

@@ -157,17 +157,18 @@ function PriceBreakdown({ inStockItems, subtotal, appliedPromo, promoDiscount, s
 }
 
 // Shipping Info Component
-function ShippingInfo({ shipping, subtotal }) {
+const ShippingInfo = ({ shipping, subtotal }) => {
   return (
     <div className="bg-gray-50 p-3 rounded-lg mb-4">
       <p className="text-sm text-gray-600">
         {shipping === 0 
-          ? '🎉 Free shipping on orders over $100' 
-          : `Add $${(100 - subtotal).toFixed(2)} more for free shipping`
+          ? '🎉 Free shipping on orders over $75' 
+          : `Add $${(75 - subtotal).toFixed(2)} more for free shipping`
         }
       </p>
     </div>
   );
+  
 }
 
 export default OrderSummary;

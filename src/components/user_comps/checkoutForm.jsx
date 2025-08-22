@@ -57,12 +57,12 @@ function CheckoutForm({
           city: shippingAddress.city,
           state: shippingAddress.state,
           postal_code: shippingAddress.zipCode,
-          country: shippingAddress.country === 'India' ? 'IN' : shippingAddress.country
+          country: 'US'
         }
       } : {
         name: 'Customer',
         address: {
-          country: 'IN'
+          country: 'US'
         }
       };
 
@@ -132,8 +132,7 @@ function CheckoutForm({
           <CreditCard className="w-5 h-5 text-[#8B5A7C]" />
           <h2 className="text-xl font-semibold text-gray-900">Complete Your Payment</h2>
         </div>
-        <p className="text-gray-600">Order Total: ₹{orderTotal.toFixed(2)}</p>
-      </div>
+        <p className="text-gray-600">Order Total: ${orderTotal.toFixed(2)}</p>      </div>
 
       {/* Show billing address info */}
       {shippingAddress && (
@@ -217,7 +216,7 @@ function CheckoutForm({
               </>
             ) : (
               <>
-                Pay ₹{orderTotal.toFixed(2)}
+                Pay ${orderTotal.toFixed(2)}
               </>
             )}
           </button>

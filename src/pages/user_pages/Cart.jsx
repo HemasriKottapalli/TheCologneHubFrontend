@@ -298,8 +298,8 @@ function Cart() {
   const outOfStockItems = cartItems.filter(item => item.stockQuantity <= 0);
   const subtotal = inStockItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const promoDiscount = appliedPromo ? (subtotal * appliedPromo.discount) / 100 : 0;
-  const shipping = subtotal > 1000 ? 0 : 50;
-  const tax = (subtotal - promoDiscount) * 0.18;
+  const shipping = subtotal > 75 ? 0 : 9.99; // Free shipping over $75, otherwise $9.99
+  const tax = (subtotal - promoDiscount) * 0.08; // 8% sales tax (adjust based on your tax requirements)
   const total = subtotal - promoDiscount + shipping + tax;
 
   // Loading state
