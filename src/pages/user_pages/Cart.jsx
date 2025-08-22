@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom'; // Add this import
 import API from '../../api';
 import OrderSummary from '../../components/user_comps/OrderSummary';
 import CartItems from '../../components/user_comps/CartItems';
-import CheckoutForm from '../../components/user_comps/CheckoutForm';
+import CheckoutForm from '../../components/user_comps/checkoutForm';
 import ShippingForm from '../../components/user_comps/ShippingForm';
 
 // Load Stripe with proper environment variable for Vite
