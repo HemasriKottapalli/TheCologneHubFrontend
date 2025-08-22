@@ -1,114 +1,128 @@
-import { useState } from 'react';
-import { Package, Truck, CheckCircle, Clock, Search, Eye, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Package, Truck, CheckCircle, Clock, Search, Eye, Download, XCircle, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import API from '../../api';
 
 function Orders() {
+  const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [orders, setOrders] = useState([]);
+  const [statusCounts, setStatusCounts] = useState({
+    all: 0,
+    pending: 0,
+    confirmed: 0,
+    processing: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [expandedAddresses, setExpandedAddresses] = useState({});
+  const [expandedItems, setExpandedItems] = useState({});
 
-  // Sample orders data
-  const orders = [
-    {
-      id: 'ORD-2024-001',
-      date: '2024-12-15',
-      status: 'delivered',
-      total: 299.99,
-      items: [
-        { name: 'Chanel Bleu de Chanel', quantity: 1, price: 150.00, image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=100&h=100&fit=crop' },
-        { name: 'Dior Sauvage', quantity: 1, price: 149.99, image: 'https://images.unsplash.com/photo-1585386699204-8d2f2bb10c62?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '123 Main St, New York, NY 10001',
-      trackingNumber: 'TRK123456789'
-    },
-    {
-      id: 'ORD-2024-002',
-      date: '2024-12-20',
-      status: 'shipped',
-      total: 89.99,
-      items: [
-        { name: 'Tom Ford Black Orchid', quantity: 1, price: 89.99, image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '456 Oak Ave, Los Angeles, CA 90210',
-      trackingNumber: 'TRK987654321'
-    },
-    {
-      id: 'ORD-2024-003',
-      date: '2024-12-22',
-      status: 'processing',
-      total: 199.99,
-      items: [
-        { name: 'Versace Eros', quantity: 1, price: 79.99, image: 'https://images.unsplash.com/photo-1588405748880-12d1d2a59d32?w=100&h=100&fit=crop' },
-        { name: 'Paco Rabanne 1 Million', quantity: 1, price: 119.99, image: 'https://images.unsplash.com/photo-1563170351-be82bc888aa4?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '789 Pine St, Chicago, IL 60601',
-      trackingNumber: null
-    },
-    {
-      id: 'ORD-2024-004',
-      date: '2024-12-23',
-      status: 'pending',
-      total: 450.00,
-      items: [
-        { name: 'Creed Aventus', quantity: 1, price: 450.00, image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '321 Elm St, Miami, FL 33101',
-      trackingNumber: null
-    },
-    {
-      id: 'ORD-2024-005',
-      date: '2024-12-24',
-      status: 'shipped',
-      total: 325.50,
-      items: [
-        { name: 'Giorgio Armani Acqua di Gio', quantity: 1, price: 125.50, image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=100&h=100&fit=crop' },
-        { name: 'Calvin Klein Eternity', quantity: 1, price: 200.00, image: 'https://images.unsplash.com/photo-1585386699204-8d2f2bb10c62?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '555 Broadway, Seattle, WA 98101',
-      trackingNumber: 'TRK456789123'
-    },
-    {
-      id: 'ORD-2024-006',
-      date: '2024-12-25',
-      status: 'delivered',
-      total: 175.99,
-      items: [
-        { name: 'Dolce & Gabbana Light Blue', quantity: 1, price: 175.99, image: 'https://images.unsplash.com/photo-1594035910387-fea47794261f?w=100&h=100&fit=crop' }
-      ],
-      shippingAddress: '777 Fifth Ave, Boston, MA 02101',
-      trackingNumber: 'TRK789123456'
+  useEffect(() => {
+    fetchOrders();
+  }, [activeFilter, searchTerm]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('📡 Fetching orders with params:', { status: activeFilter, search: searchTerm });
+      const response = await API.get('/api/customer/orders', {
+        params: {
+          status: activeFilter === 'all' ? undefined : activeFilter,
+          search: searchTerm.trim() || undefined,
+          page: 1,
+          limit: 50,
+        },
+      });
+
+      console.log('✅ API Response:', response.data);
+      console.log('📊 Status Counts from API:', response.data.statusCounts);
+
+      if (response.data.success) {
+        setOrders(response.data.orders || []);
+        setStatusCounts({
+          all: response.data.statusCounts?.all ?? 0,
+          pending: response.data.statusCounts?.pending ?? 0,
+          confirmed: response.data.statusCounts?.confirmed ?? 0,
+          processing: response.data.statusCounts?.processing ?? 0,
+          shipped: response.data.statusCounts?.shipped ?? 0,
+          delivered: response.data.statusCounts?.delivered ?? 0,
+          cancelled: response.data.statusCounts?.cancelled ?? 0,
+        });
+      } else {
+        throw new Error(response.data.message || 'Failed to fetch orders');
+      }
+    } catch (err) {
+      console.error('❌ Error fetching orders:', err);
+      setError(err.response?.data?.message || 'Failed to load orders. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const getStatusConfig = (status) => {
     const configs = {
       pending: { icon: Clock, color: 'text-orange-600', bg: 'bg-orange-100', text: 'Pending' },
+      confirmed: { icon: CheckCircle, color: 'text-indigo-600', bg: 'bg-indigo-100', text: 'Confirmed' },
       processing: { icon: Package, color: 'text-blue-600', bg: 'bg-blue-100', text: 'Processing' },
       shipped: { icon: Truck, color: 'text-purple-600', bg: 'bg-purple-100', text: 'Shipped' },
-      delivered: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', text: 'Delivered' }
+      delivered: { icon: CheckCircle, color: 'text-green-600', bg: 'bg-green-100', text: 'Delivered' },
+      cancelled: { icon: XCircle, color: 'text-red-600', bg: 'bg-red-100', text: 'Cancelled' },
     };
     return configs[status] || configs.pending;
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesFilter = activeFilter === 'all' || order.status === activeFilter;
-    const matchesSearch = order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.items.some(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesFilter && matchesSearch;
-  });
-
-  const statusCounts = {
-    all: orders.length,
-    pending: orders.filter(o => o.status === 'pending').length,
-    processing: orders.filter(o => o.status === 'processing').length,
-    shipped: orders.filter(o => o.status === 'shipped').length,
-    delivered: orders.filter(o => o.status === 'delivered').length
+  const toggleAddress = (orderId) => {
+    setExpandedAddresses((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
   };
+
+  const toggleItems = (orderId) => {
+    setExpandedItems((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId],
+    }));
+  };
+
+  if (loading) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="text-center py-16">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#8B5A7C] mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading your orders...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="text-center py-16">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Orders</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchOrders}
+            className="px-6 py-3 bg-[#8B5A7C] text-white rounded-lg hover:bg-[#8B5A7C]/90 transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-
-      {/* Filters and Search */}
       <div className="mb-6 space-y-4">
-        {/* Status Filter Pills */}
         <div className="flex flex-wrap gap-2">
           {Object.entries(statusCounts).map(([status, count]) => (
             <button
@@ -124,8 +138,6 @@ function Orders() {
             </button>
           ))}
         </div>
-
-        {/* Search Bar */}
         <div className="relative max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
@@ -137,80 +149,200 @@ function Orders() {
           />
         </div>
       </div>
-
-      {/* Orders Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredOrders.map((order) => {
+      
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+        {orders.map((order) => {
           const statusConfig = getStatusConfig(order.status);
           const StatusIcon = statusConfig.icon;
+          const isAddressExpanded = expandedAddresses[order.id];
+          const isItemsExpanded = expandedItems[order.id];
+          const hasMoreItems = order.items.length > 2;
+          const displayItems = isItemsExpanded ? order.items : order.items.slice(0, 2);
 
           return (
-            <div key={order.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-fit">
-              {/* Order Header */}
-              <div className="p-4 border-b border-gray-100">
-                <div className="flex items-center justify-between mb-2">
-                  <div>
-                    <h3 className="font-semibold text-gray-900 text-sm">{order.id}</h3>
-                    <p className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</p>
+            <div key={order.id} className="bg-white rounded-xl shadow-md border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow duration-200">
+              {/* Header Section */}
+              <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-200">
+                <div className="flex items-start justify-between mb-2 sm:mb-3">
+                  <div className="flex-1 min-w-0 pr-2">
+                    <h3 className="font-bold text-gray-900 text-sm sm:text-base mb-1 truncate">{order.orderId}</h3>
+                    <p className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'short', 
+                      day: 'numeric' 
+                    })}</p>
                   </div>
-                  <div className={`flex items-center gap-1 px-2 py-1 rounded-full ${statusConfig.bg}`}>
-                    <StatusIcon className={`w-3 h-3 ${statusConfig.color}`} />
-                    <span className={`text-xs font-medium ${statusConfig.color}`}>
+                  <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full ${statusConfig.bg} shadow-sm flex-shrink-0`}>
+                    <StatusIcon className={`w-3 sm:w-3.5 h-3 sm:h-3.5 ${statusConfig.color}`} />
+                    <span className={`text-xs font-semibold ${statusConfig.color}`}>
                       {statusConfig.text}
                     </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
-                  <p className="text-lg font-bold text-gray-900">${order.total}</p>
-                  <p className="text-sm text-gray-500">{order.items.length} item(s)</p>
+                  <div className="flex items-baseline gap-2">
+                    <p className="text-lg sm:text-xl font-bold text-[#8B5A7C]">${order.total.toFixed(2)}</p>
+                  </div>
+                  <div className="flex items-center gap-1 text-gray-600">
+                    <ShoppingBag className="w-3 sm:w-4 h-3 sm:h-4" />
+                    <span className="text-xs sm:text-sm font-medium">{order.items.length}</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Order Items */}
-              <div className="p-4">
-                <div className="space-y-2 mb-4">
-                  {order.items.slice(0, 2).map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <img 
-                        src={item.image} 
-                        alt={item.name}
-                        className="w-8 h-8 object-cover rounded-lg flex-shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900 text-sm truncate">{item.name}</h4>
-                        <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+              {/* Items Section */}
+              <div className="px-4 sm:px-5 py-3 sm:py-4">
+                <div className="space-y-2 sm:space-y-3">
+                  {displayItems.map((item, index) => (
+                    <div key={index} className="flex items-center gap-2 sm:gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                      <div className="relative flex-shrink-0">
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-10 sm:w-12 h-10 sm:h-12 object-cover rounded-lg border border-gray-200"
+                        />
+                        <div className="absolute -top-1 -right-1 bg-[#8B5A7C] text-white text-xs rounded-full w-4 sm:w-5 h-4 sm:h-5 flex items-center justify-center font-bold">
+                          {item.quantity}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-semibold text-gray-900 text-sm">${item.price}</p>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-gray-900 text-xs sm:text-sm leading-tight mb-1 line-clamp-2">{item.name}</h4>
+                        <p className="text-xs text-gray-500">Unit: ${item.price.toFixed(2)}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-bold text-gray-900 text-xs sm:text-sm">${(item.price * item.quantity).toFixed(2)}</p>
                       </div>
                     </div>
                   ))}
-                  {order.items.length > 2 && (
-                    <div className="text-xs text-gray-500 text-center py-1">
-                      +{order.items.length - 2} more item(s)
+                  
+                  {hasMoreItems && (
+                    <div className="text-center pt-2">
+                      <button
+                        onClick={() => toggleItems(order.id)}
+                        className="text-xs sm:text-sm text-[#8B5A7C] hover:text-[#8B5A7C]/80 font-medium flex items-center gap-1 mx-auto transition-colors touch-manipulation"
+                      >
+                        {isItemsExpanded ? (
+                          <>
+                            <ChevronUp className="w-4 h-4" /> 
+                            Show Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-4 h-4" /> 
+                            Show {order.items.length - 2} More Items
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Shipping Info */}
-                <div className="pt-3 border-t border-gray-100">
-                  <div className="mb-3">
-                    <p className="text-xs font-medium text-gray-900 mb-1">Shipping Address</p>
-                    <p className="text-xs text-gray-600 leading-relaxed">{order.shippingAddress}</p>
-                    {order.trackingNumber && (
-                      <p className="text-xs text-gray-600 mt-1">
-                        Tracking: <span className="font-mono text-[#8B5A7C]">{order.trackingNumber}</span>
+              {/* Footer Section */}
+              <div className="px-4 sm:px-5 pb-4 sm:pb-5">
+                <div className="pt-3 sm:pt-4 border-t border-gray-100 space-y-3 sm:space-y-4">
+                  {/* Shipping Address */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-semibold text-gray-900 uppercase tracking-wide">Shipping Address</p>
+                      <button
+                        onClick={() => toggleAddress(order.id)}
+                        className="text-xs text-[#8B5A7C] hover:text-[#8B5A7C]/80 font-medium flex items-center gap-1 transition-colors touch-manipulation"
+                      >
+                        {isAddressExpanded ? (
+                          <>
+                            <ChevronUp className="w-3 h-3" /> Less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="w-3 h-3" /> More
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    
+                    {isAddressExpanded ? (
+                      <div className="text-xs text-gray-700 leading-relaxed bg-gray-50 p-3 rounded-lg">
+                        {/* Handle both string and object shippingAddress */}
+                        {typeof order.shippingAddress === 'string' ? (
+                          <div>
+                            <p className="font-medium mb-1">Delivery Address:</p>
+                            <p className="whitespace-pre-line">{order.shippingAddress}</p>
+                          </div>
+                        ) : (
+                          <div>
+                            <p className="font-medium">
+                              {order.shippingAddress?.fullName || order.shippingAddress?.name || order.customerName || 'Customer'}
+                            </p>
+                            <p>{order.shippingAddress?.address || order.shippingAddress?.street || ''}</p>
+                            <p>
+                              {order.shippingAddress?.city || ''}{order.shippingAddress?.city ? ', ' : ''}{order.shippingAddress?.state || ''}{' '}
+                              {order.shippingAddress?.zip || order.shippingAddress?.zipCode || order.shippingAddress?.postalCode || ''}
+                            </p>
+                            {(order.shippingAddress?.country || order.country) && (
+                              <p>{order.shippingAddress?.country || order.country}</p>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* Estimated Delivery */}
+                        {order.estimatedDelivery && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-900">Estimated Delivery:</p>
+                            <p className="text-[#8B5A7C]">
+                              {new Date(order.estimatedDelivery).toLocaleDateString('en-US', { 
+                                weekday: 'short',
+                                year: 'numeric', 
+                                month: 'short', 
+                                day: 'numeric' 
+                              })}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Tracking Number */}
+                        {order.trackingNumber && (
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="font-medium text-gray-900">Tracking Number:</p>
+                            <p className="font-mono text-[#8B5A7C] bg-white px-2 py-1 rounded border mt-1 inline-block break-all">
+                              {order.trackingNumber}
+                            </p>
+                          </div>
+                        )}
+                        
+                        {/* Payment Info */}
+                        <div className="mt-2 pt-2 border-t border-gray-200">
+                          <p className="font-medium text-gray-900">Payment:</p>
+                          <p className="capitalize text-gray-600">
+                            {order.paymentMethod || 'N/A'} • {order.paymentStatus || 'Unknown'}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-600 line-clamp-1">
+                        {typeof order.shippingAddress === 'string' 
+                          ? order.shippingAddress 
+                          : (order.shippingAddress?.address || order.shippingAddress?.street || order.address || 
+                             `${order.shippingAddress?.city || ''} ${order.shippingAddress?.state || ''}`.trim() || 'Address not available')
+                        }
                       </p>
                     )}
                   </div>
-                  <div className="flex gap-2">
-                    <button className="flex items-center gap-1 px-2 py-1 text-xs text-[#8B5A7C] hover:bg-[#8B5A7C]/10 rounded-lg transition-colors flex-1 justify-center">
-                      <Eye className="w-3 h-3" />
-                      View
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button
+                      onClick={() => navigate(`/order-confirmation/${order.id}`)}
+                      className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-[#8B5A7C] bg-[#8B5A7C]/10 hover:bg-[#8B5A7C]/20 rounded-lg transition-colors flex-1 justify-center font-medium touch-manipulation"
+                    >
+                      <Eye className="w-4 h-4" />
+                      View Details
                     </button>
                     {order.status === 'delivered' && (
-                      <button className="flex items-center gap-1 px-2 py-1 text-xs text-[#8B5A7C] hover:bg-[#8B5A7C]/10 rounded-lg transition-colors flex-1 justify-center">
-                        <Download className="w-3 h-3" />
+                      <button
+                        className="flex items-center gap-2 px-3 sm:px-4 py-2 sm:py-2.5 text-xs sm:text-sm text-[#8B5A7C] bg-[#8B5A7C]/10 hover:bg-[#8B5A7C]/20 rounded-lg transition-colors flex-1 justify-center font-medium touch-manipulation"
+                      >
+                        <Download className="w-4 h-4" />
                         Invoice
                       </button>
                     )}
@@ -221,16 +353,18 @@ function Orders() {
           );
         })}
       </div>
-
-      {/* Empty State */}
-      {filteredOrders.length === 0 && (
+      
+      {orders.length === 0 && (
         <div className="text-center py-16">
           <div className="text-gray-400 text-6xl mb-4">📦</div>
           <h3 className="text-xl font-semibold text-gray-900 mb-2">No orders found</h3>
           <p className="text-gray-600 mb-4">
-            {searchTerm ? 'Try adjusting your search criteria' : 'You haven\'t placed any orders yet'}
+            {searchTerm ? 'Try adjusting your search criteria' : "You haven't placed any orders yet"}
           </p>
-          <button className="px-6 py-3 bg-[#8B5A7C] text-white rounded-lg hover:bg-[#8B5A7C]/90 transition-colors">
+          <button
+            onClick={() => navigate('/products')}
+            className="px-6 py-3 bg-[#8B5A7C] text-white rounded-lg hover:bg-[#8B5A7C]/90 transition-colors"
+          >
             Browse Products
           </button>
         </div>

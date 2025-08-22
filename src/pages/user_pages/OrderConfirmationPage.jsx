@@ -1,3 +1,4 @@
+// components/user_comps/OrderConfirmation.jsx - Fixed version with currency change
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle, Package, Truck, Calendar, MapPin, CreditCard, Download, ArrowRight } from 'lucide-react';
@@ -120,7 +121,7 @@ function OrderConfirmation() {
             Order ID: {orderId}<br/>
             Order Status: {order.status}<br/>
             Payment Status: {order.paymentStatus}<br/>
-            Total: ₹{order.total}
+            Total: ${order.total}
           </div>
         )}
       </div>
@@ -133,7 +134,7 @@ function OrderConfirmation() {
           <div>
             <h3 className="font-semibold mb-2">Order Details</h3>
             <p>Status: <span className="capitalize font-medium text-green-600">{order.status}</span></p>
-            <p>Total: <span className="font-bold">₹{order.total?.toFixed(2)}</span></p>
+            <p>Total: <span className="font-bold">${order.total?.toFixed(2)}</span></p>
             <p>Items: {order.items?.length || 0}</p>
           </div>
           
