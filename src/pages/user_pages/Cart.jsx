@@ -1,4 +1,3 @@
-// pages/Cart.jsx - Updated version with proper Stripe integration
 import { useState, useEffect } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
@@ -8,8 +7,8 @@ import CartItems from '../../components/user_comps/CartItems';
 import CheckoutForm from '../../components/user_comps/CheckoutForm';
 import ShippingForm from '../../components/user_comps/ShippingForm';
 
-// Load Stripe with your publishable key
-const stripePromise = loadStripe(import.meta.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+// Load Stripe with proper environment variable for Vite
+const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
 function Cart() {
   const [cartItems, setCartItems] = useState([]);
@@ -25,6 +24,14 @@ function Cart() {
   const [shippingAddress, setShippingAddress] = useState(null);
   const [clientSecret, setClientSecret] = useState('');
   const [orderId, setOrderId] = useState('');
+
+  // Debug: Check if Stripe key is loaded
+  useEffect(() => {
+    console.log('Stripe publishable key:', import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ? 'Found' : 'Missing');
+    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+      setError('Stripe configuration is missing. Please check environment variables.');
+    }
+  }, []);
 
   // Fetch cart items on component mount
   useEffect(() => {
@@ -161,6 +168,13 @@ function Cart() {
       setError('No items available for checkout');
       return;
     }
+    
+    // Check if Stripe is properly configured
+    if (!import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY) {
+      setError('Payment system is not configured. Please contact support.');
+      return;
+    }
+    
     setCheckoutStep('shipping');
   };
 
@@ -188,14 +202,17 @@ function Cart() {
         shippingAddress: shippingData
       };
 
+      console.log('Creating payment intent with data:', checkoutData);
+
       const response = await API.post('/api/customer/create-payment-intent', checkoutData);
       
       if (response.data.success) {
         setClientSecret(response.data.clientSecret);
         setOrderId(response.data.orderId);
         setCheckoutStep('payment');
+        console.log('Payment intent created successfully');
       } else {
-        setError('Failed to initialize payment');
+        setError(response.data.message || 'Failed to initialize payment');
       }
       
     } catch (err) {
@@ -228,6 +245,7 @@ function Cart() {
   // Handle payment error
   const handlePaymentError = (errorMessage) => {
     setError(errorMessage);
+    console.error('Payment error:', errorMessage);
   };
 
   // Back to previous step
@@ -288,31 +306,33 @@ function Cart() {
   // Render based on checkout step
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* Progress indicator */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center space-x-4">
-          <div className={`flex items-center ${checkoutStep === 'cart' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              checkoutStep === 'cart' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
-            }`}>1</div>
-            <span className="ml-2 font-medium">Cart</span>
-          </div>
-          <div className="w-12 h-px bg-gray-300"></div>
-          <div className={`flex items-center ${checkoutStep === 'shipping' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              checkoutStep === 'shipping' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
-            }`}>2</div>
-            <span className="ml-2 font-medium">Shipping</span>
-          </div>
-          <div className="w-12 h-px bg-gray-300"></div>
-          <div className={`flex items-center ${checkoutStep === 'payment' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-              checkoutStep === 'payment' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
-            }`}>3</div>
-            <span className="ml-2 font-medium">Payment</span>
+      {/* Progress indicator - Always show when not empty cart */}
+      {cartItems.length > 0 && (
+        <div className="mb-8">
+          <div className="flex items-center justify-center space-x-4">
+            <div className={`flex items-center ${checkoutStep === 'cart' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                checkoutStep === 'cart' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+              }`}>1</div>
+              <span className="ml-2 font-medium">Cart</span>
+            </div>
+            <div className="w-12 h-px bg-gray-300"></div>
+            <div className={`flex items-center ${checkoutStep === 'shipping' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                checkoutStep === 'shipping' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+              }`}>2</div>
+              <span className="ml-2 font-medium">Shipping</span>
+            </div>
+            <div className="w-12 h-px bg-gray-300"></div>
+            <div className={`flex items-center ${checkoutStep === 'payment' ? 'text-[#8B5A7C]' : 'text-gray-400'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+                checkoutStep === 'payment' ? 'bg-[#8B5A7C] text-white' : 'bg-gray-200'
+              }`}>3</div>
+              <span className="ml-2 font-medium">Payment</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Error display */}
       {error && (
