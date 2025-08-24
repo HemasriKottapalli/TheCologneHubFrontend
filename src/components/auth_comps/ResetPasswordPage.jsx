@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FiLock, FiEye, FiEyeOff, FiCheckCircle, FiX } from 'react-icons/fi';
 import API from '../../api';
+import { useNavigate } from 'react-router-dom';
 
 const ResetPasswordPage = () => {
+  const navigate = useNavigate();
   const getTokenFromUrl = () => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('token');
@@ -57,7 +59,7 @@ const ResetPasswordPage = () => {
         setSuccess(true);
         setConfirmationMessage('Your password has been successfully reset! Redirecting to login...');
         setTimeout(() => {
-          window.location.href = '/?showLogin=true';
+          navigate('/login');
         }, 3000);
       }
     } catch (err) {
@@ -72,7 +74,7 @@ const ResetPasswordPage = () => {
   };
 
   const handleGoHome = () => {
-    window.location.href = '/';
+    navigate('/login');
   };
 
   if (success) {
@@ -215,7 +217,7 @@ const ResetPasswordPage = () => {
               onClick={handleGoHome}
               className="text-main-color hover:underline text-sm"
             >
-              Back to Home
+              Back to Login
             </button>
           </div>
         </div>

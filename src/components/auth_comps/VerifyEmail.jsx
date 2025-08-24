@@ -13,24 +13,30 @@ const VerifyEmail = () => {
 
   useEffect(() => {
     if (!token) {
-      setError('Invalid verification link');
+      setError('Invalid verification link: No token provided');
       setStatus('error');
       return;
     }
 
     const verifyEmail = async () => {
       try {
+        console.log('Verifying email with token:', token);
         const response = await API.get(`/api/auth/verify-email/${token}`);
+        console.log('Verification response:', response.data);
         if (response.data.success) {
           setStatus('success');
           setMessage(`Email verified successfully! Welcome, ${response.data.username}! You will be redirected to login shortly.`);
           setTimeout(() => {
-            navigate('/?showLogin=true');
+            navigate('/login');
           }, 3000);
         }
       } catch (err) {
+        console.error('Verification error:', err);
         setStatus('error');
-        setError(err.response?.data?.message || 'Failed to verify email. Please try again or request a new verification link.');
+        setError(
+          err.response?.data?.message ||
+          'Failed to verify email. The link may be invalid or expired. Please request a new verification link.'
+        );
       }
     };
 
@@ -38,7 +44,7 @@ const VerifyEmail = () => {
   }, [token, navigate]);
 
   const handleGoHome = () => {
-    navigate('/');
+    navigate('/login');
   };
 
   return (
@@ -88,7 +94,7 @@ const VerifyEmail = () => {
               onClick={handleGoHome}
               className="bg-main-color text-white py-3 px-6 rounded-lg font-medium hover:bg-comp-color transition-colors duration-200"
             >
-              Back to Home
+              Back to Login
             </button>
           </div>
         )}

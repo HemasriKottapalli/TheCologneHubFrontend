@@ -4,11 +4,12 @@ import HeroSection from '../../components/user_comps/HeroSection.jsx';
 import About from '../../components/user_comps/About.jsx';
 import EmailSubscription from '../../components/user_comps/EmailSubscription.jsx';
 import ShopCategories from '../../components/user_comps/ShopCategories.jsx';
-// import PopularBrands from '../../components/user_comps/PopularBrands.jsx';
+import AuthModal from '../../components/auth_comps/AuthModal.jsx'; // Adjust path as needed
 
-function LandingPage() {
+function LandingPage({ authModalOpen = false, authModalType = 'login' }) {
   const [showVerificationSuccess, setShowVerificationSuccess] = useState(false);
   const [username, setUsername] = useState('');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(authModalOpen);
 
   useEffect(() => {
     // Check if user just got verified
@@ -16,10 +17,9 @@ function LandingPage() {
     const verified = urlParams.get('verified');
     
     if (verified === 'true') {
-      // Try to get username from localStorage or other auth state
       const storedUsername = localStorage.getItem('username') || 
-                            localStorage.getItem('user') || 
-                            'there'; // fallback
+                           localStorage.getItem('user') || 
+                           'there';
       setUsername(storedUsername);
       setShowVerificationSuccess(true);
       
@@ -31,10 +31,23 @@ function LandingPage() {
         setShowVerificationSuccess(false);
       }, 5000);
     }
-  }, []);
+
+    // Handle auth modal state from props
+    if (authModalOpen) {
+      setIsAuthModalOpen(true);
+      // Clean up any query parameters like showLogin=true
+      if (window.location.search.includes('showLogin=true')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, [authModalOpen]);
 
   const closeVerificationToast = () => {
     setShowVerificationSuccess(false);
+  };
+
+  const handleCloseAuthModal = () => {
+    setIsAuthModalOpen(false);
   };
 
   return (
@@ -75,9 +88,15 @@ function LandingPage() {
         </div>
       )}
       
-      {/* Your existing LandingPage content */}
+      {/* Auth Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={handleCloseAuthModal}
+        initialType={authModalType}
+      />
+
+      {/* Existing LandingPage content */}
       <HeroSection />
-      {/* <PopularBrands /> */}
       <ShopCategories />
       <About id="about" />
       <EmailSubscription />
@@ -110,6 +129,6 @@ function LandingPage() {
       `}</style>
     </div>
   );
-};
+}
 
 export default LandingPage;
