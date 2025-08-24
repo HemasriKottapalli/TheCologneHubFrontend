@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { FiLock, FiEye, FiEyeOff, FiCheckCircle, FiX } from 'react-icons/fi';
-import API from '../../api'; // Adjust path to your API
+import API from '../../api';
 
 const ResetPasswordPage = () => {
-  // Get token from URL parameters
   const getTokenFromUrl = () => {
     const urlParams = new URLSearchParams(window.location.search);
     return urlParams.get('token');
@@ -18,6 +17,7 @@ const ResetPasswordPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [confirmationMessage, setConfirmationMessage] = useState('');
 
   useEffect(() => {
     if (!token) {
@@ -46,6 +46,7 @@ const ResetPasswordPage = () => {
 
     setIsLoading(true);
     setError('');
+    setConfirmationMessage('');
 
     try {
       const response = await API.post(`/api/auth/reset-password/${token}`, {
@@ -54,8 +55,7 @@ const ResetPasswordPage = () => {
 
       if (response.data.success) {
         setSuccess(true);
-        
-        // Redirect to home with login prompt after 3 seconds
+        setConfirmationMessage('Your password has been successfully reset! Redirecting to login...');
         setTimeout(() => {
           window.location.href = '/?showLogin=true';
         }, 3000);
@@ -82,7 +82,7 @@ const ResetPasswordPage = () => {
           <FiCheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-green-600 mb-2">Password Reset Successful!</h1>
           <p className="text-gray-600 mb-6">
-            Your password has been successfully reset. You will be redirected to login shortly.
+            {confirmationMessage}
           </p>
           <button
             onClick={handleGoHome}
