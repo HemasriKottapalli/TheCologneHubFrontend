@@ -19,6 +19,7 @@ import ProtectedRoute from './components/common_comps/ProtectedRoute'; // Adjust
 import ManageBrands from './pages/admin_pages/ManageBrands';
 import ManageInventory from './pages/admin_pages/ManageInvenTory';
 import OrderConfirmation from './pages/user_pages/OrderConfirmationPage';
+import ResetPasswordPage from './components/auth_comps/ResetPasswordPage';
 
 function App() {
   return (
@@ -46,6 +47,8 @@ function App() {
         </Route>
 
         <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
+
+         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* Admin Routes - Admin Only */}
         <Route 
