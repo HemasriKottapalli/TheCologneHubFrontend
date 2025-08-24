@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FiCheckCircle, FiX } from 'react-icons/fi';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import API from '../api';
+import API from '../../api';
 
 const VerifyEmail = () => {
   const [searchParams] = useSearchParams();
