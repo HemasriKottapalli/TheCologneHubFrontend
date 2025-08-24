@@ -20,6 +20,7 @@ import ManageBrands from './pages/admin_pages/ManageBrands';
 import ManageInventory from './pages/admin_pages/ManageInvenTory';
 import OrderConfirmation from './pages/user_pages/OrderConfirmationPage';
 import ResetPasswordPage from './components/auth_comps/ResetPasswordPage';
+import VerifyEmail from './components/auth_comps/VerifyEmail';
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
         <Route path="/order-confirmation/:orderId" element={<OrderConfirmation />} />
 
          <Route path="/reset-password" element={<ResetPasswordPage />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
         {/* Admin Routes - Admin Only */}
         <Route 
