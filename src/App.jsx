@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import LandingPage from './pages/user_pages/LandingPage';
 import Layout from './components/user_comps/Layout';
 import Shop from './pages/user_pages/Shop';
@@ -17,9 +18,9 @@ import ResetPasswordPage from './components/auth_comps/ResetPasswordPage';
 import VerifyEmail from './components/auth_comps/VerifyEmail';
 import ProtectedRoute from './components/common_comps/ProtectedRoute';
 import ScrollToTop from './components/common_comps/ScrolllToTop';
-import { useState, useEffect } from 'react';
 
-function App() {
+// Inner component to use hooks within BrowserRouter
+function AppContent() {
   const [searchParams] = useSearchParams();
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalType, setAuthModalType] = useState('login');
@@ -32,7 +33,7 @@ function App() {
   }, [searchParams]);
 
   return (
-    <BrowserRouter>
+    <>
       <ScrollToTop />
       <Routes>
         {/* Public Routes - Accessible to everyone (no login required) */}
@@ -90,6 +91,14 @@ function App() {
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <AppContent />
     </BrowserRouter>
   );
 }
