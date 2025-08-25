@@ -23,7 +23,10 @@ const ManageOrders = () => {
   const [error, setError] = useState("");
 
   const invoiceRef = useRef();
-  const handlePrint = useReactToPrint({ content: () => invoiceRef.current });
+
+  const handlePrint = useReactToPrint({
+    contentRef: invoiceRef,
+  });
 
   const statusColors = {
     pending: "bg-yellow-100 text-yellow-800",
