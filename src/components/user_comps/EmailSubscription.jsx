@@ -2,27 +2,40 @@ import { useState } from 'react';
 import { HiOutlineMail } from 'react-icons/hi';
 import { FaCheck } from 'react-icons/fa';
 import { FiShield } from 'react-icons/fi';
+import axios from 'axios';
+import API from '../../api';
 
 function EmailSubscription() {
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) return;
+    if (!email || !email.includes('@')) {
+      setError('Please enter a valid email.');
+      return;
+    }
 
     setIsLoading(true);
+    setError('');
 
-    setTimeout(() => {
+    try {
+      const res = await API.post('/api/subscribers/add', { email });
+      console.log(res.data);
       setIsSubscribed(true);
-      setIsLoading(false);
       setEmail('');
-    }, 1500);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Something went wrong, try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const resetSubscription = () => {
     setIsSubscribed(false);
+    setError('');
   };
 
   return (
@@ -64,6 +77,8 @@ function EmailSubscription() {
                 )}
               </button>
             </form>
+
+            {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
 
             <div className="mt-3 text-xs text-gray-500 flex items-center justify-center gap-1">
               <FiShield className="text-sm" />

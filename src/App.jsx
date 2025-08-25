@@ -18,6 +18,8 @@ import ResetPasswordPage from './components/auth_comps/ResetPasswordPage';
 import VerifyEmail from './components/auth_comps/VerifyEmail';
 import ProtectedRoute from './components/common_comps/ProtectedRoute';
 import ScrollToTop from './components/common_comps/ScrolllToTop';
+import DashBoard from './pages/admin_pages/Dashboard';
+import SubscribersPage from './pages/admin_pages/SubscribersPage';
 
 // Inner component to use hooks within BrowserRouter
 function AppContent() {
@@ -80,12 +82,14 @@ function AppContent() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/admin/products" replace />} />
+         <Route index element={<Navigate to="/admin/DashBoard" replace />} />
+          <Route path="DashBoard" element={<DashBoard />} />
           <Route path="products" element={<ManageProducts />} />
           <Route path="orders" element={<ManageOrders />} />
           <Route path="users" element={<ManageUsers />} />
           <Route path="brands" element={<ManageBrands />} />
           <Route path="inventory" element={<ManageInventory />} />
+          <Route path='Subscribers' element={<SubscribersPage />}/>
         </Route>
 
         {/* Fallback route */}

@@ -157,31 +157,47 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
   // User Profile Dropdown Component (only visible on desktop - hidden on mobile)
   const UserProfileDropdown = () => (
     <div className="relative group hidden md:block">
-      <button className="flex items-center space-x-2 p-2 text-gray-700 hover:text-main-color transition-colors duration-200">
-        <FiUser size={20} />
+      <button className="flex items-center space-x-2 p-2 rounded-lg text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200">
+        <div className="w-8 h-8 bg-main-color rounded-full flex items-center justify-center text-white font-semibold text-sm">
+          {username.charAt(0).toUpperCase()}
+        </div>
         <span className="hidden lg:block text-sm font-medium">
           {username}
         </span>
       </button>
       
       {/* Dropdown Menu */}
-      <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-        <div className="py-3">
-          {/* User Info */}
-          <div className="px-4 py-2 border-b border-gray-100">
-            <p className="text-sm font-medium text-gray-900">{username}</p>
-            <p className="text-xs text-gray-500 mt-1">{email}</p>
-            <p className="text-xs text-blue-600 mt-1 capitalize">{role}</p>
+      <div className="absolute right-0 mt-3 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 transform scale-95 group-hover:scale-100 z-50">
+        {/* Arrow pointing up */}
+        <div className="absolute -top-2 right-6 w-4 h-4 bg-white border-l border-t border-gray-100 rotate-45"></div>
+        
+        <div className="py-4">
+          {/* User Info Section */}
+          <div className="px-5 pb-4 border-b border-gray-100">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-main-color rounded-full flex items-center justify-center text-white font-bold text-lg shadow-md">
+                {username.charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-gray-900 truncate">{username}</p>
+                <p className="text-sm text-gray-500 truncate">{email}</p>
+              </div>
+            </div>
           </div>
           
-          {/* Logout Option */}
-          <div className="py-2">
+          {/* Logout Section */}
+          <div className="pt-2">
             <button
               onClick={handleLogout}
-              className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center space-x-2"
+              className="w-full flex items-center space-x-3 px-5 py-3 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 group/logout"
             >
-              <FiLogOut size={16} />
-              <span>Logout</span>
+              <div className="w-8 h-8 rounded-lg bg-red-100 group-hover/logout:bg-red-200 transition-colors duration-200 flex items-center justify-center">
+                <FiLogOut size={16} />
+              </div>
+              <div className="text-left">
+                <p className="font-medium">Sign Out</p>
+                <p className="text-xs text-red-500">Sign out of your account</p>
+              </div>
             </button>
           </div>
         </div>
@@ -226,16 +242,22 @@ const Header = ({ onLoginClick, onRegisterClick }) => {
       <header className="bg-white fixed top-0 z-50 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo */}
+            {/* Logo - Non-clickable for admin */}
             <div className="flex-shrink-0">
-              <Link to="/" className="text-2xl font-bold font-[Caveat] text-main-color">
+              <span className="text-2xl font-bold font-[Caveat] text-main-color cursor-default">
                 The Cologne Hub
-              </Link>
+              </span>
             </div>
 
-            {/* Admin Profile Only */}
-            <div className="flex items-center">
-              <UserProfileDropdown />
+            {/* Admin Profile - Simple display only */}
+            <div className="flex items-center space-x-2 p-2 text-gray-700">
+              <FiUser size={20} />
+              <span className="text-sm font-medium">
+                {username}
+              </span>
+              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded-full capitalize">
+                {role}
+              </span>
             </div>
           </div>
         </div>
