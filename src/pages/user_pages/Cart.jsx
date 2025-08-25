@@ -182,6 +182,7 @@ function Cart() {
     setCheckoutStep('shipping');
   };
 
+  
   const handleShippingSubmit = async (shippingData) => {
     try {
       setCheckoutLoading(true);
@@ -323,7 +324,7 @@ function Cart() {
           <h3 className="text-xl font-semibold text-gray-900 mb-2">Your cart is empty</h3>
           <p className="text-gray-600 mb-4">Add some amazing fragrances to get started</p>
           <button 
-            onClick={() => navigate('/products')}
+            onClick={() => navigate('/shop')}
             className="px-6 py-3 bg-[#8B5A7C] text-white rounded-lg hover:bg-[#8B5A7C]/90 transition-colors"
           >
             Continue Shopping
@@ -368,13 +369,6 @@ function Cart() {
         <div className="mb-6 p-4 bg-red-100 border border-red-300 text-red-700 rounded-md flex justify-between items-center">
           <span>{error}</span>
           <button onClick={clearError} className="text-red-500 hover:text-red-700">×</button>
-        </div>
-      )}
-
-      {/* Debug info - remove this in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
-          <strong>Debug:</strong> Step = {checkoutStep}, Items = {cartItems.length}, Order ID = {orderId || 'none'}
         </div>
       )}
 
